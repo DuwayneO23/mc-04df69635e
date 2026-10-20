@@ -1,5 +1,5 @@
 // Offline cache: the app is a handful of static files, so it opens with no signal. Bump V on every release.
-const V = 'dashcam-v0.2.0';
+const V = 'dashcam-v0.3.0';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

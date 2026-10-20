@@ -35,7 +35,9 @@ body.rec #recdot { background: var(--rec); animation: blink 1.2s steps(2) infini
 @keyframes blink { 50% { opacity: .25; } }
 #spd { font-size: 26px; font-weight: 700; }
 .muted { color: var(--dim); }
-.warn { color: var(--save); }
+.warn { color: var(--save); font-weight: 600; }
+#link.ok { color: var(--ok); }
+#link.bad { color: var(--rec); }
 
 #ctl { position: fixed; display: flex; gap: 12px; align-items: center; justify-content: center;
   left: 0; right: 0; bottom: 0; padding: 12px calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 12px);
@@ -70,7 +72,8 @@ body.rec #go { background: #ffffff26; color: var(--ink); }
 .row .acts button.hot { background: var(--accent); color: #000; }
 label.set { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 label.set span small { display: block; color: var(--dim); font-size: 13px; }
-label.set input, label.set select { width: 96px; height: 38px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; padding: 0 8px; }
+label.set input { width: 96px; height: 38px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; padding: 0 8px; }
+input.wide { width: 100%; height: 44px; margin-top: 10px; border-radius: 8px; border: 1px solid var(--line); background: #0b0d10; color: var(--ink); font: inherit; padding: 0 10px; }
 pre#logtxt { margin: 0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; color: #cfd6dd; }
 #player { width: 100%; max-height: 60vh; background: #000; border-radius: 10px; }
 </style>
@@ -85,6 +88,7 @@ pre#logtxt { margin: 0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace
   <span id="clock"></span>
   <span><span id="spd">–</span> <span class="muted">km/h</span></span>
   <span id="gps" class="muted">GPS –</span>
+  <span id="link"></span>
   <span id="store" class="muted"></span>
   <span id="alert" class="warn"></span>
 </div>
@@ -119,9 +123,10 @@ pre#logtxt { margin: 0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace
 
 <script>
 'use strict';
-// Dash Cam: records the back camera in short MP4 segments into IndexedDB, keeps a rolling window of footage,
-// and locks segments around a save (button or impact) so they are never pruned. Upload to TARS comes later.
-const VERSION = '0.2.0';
+// Dash Cam: records the back camera in short MP4 segments into IndexedDB, keeps a rolling window of footage, and locks
+// segments around a save (button, impact, or "save that" sent to TARS) so they are never pruned. When linked to the PC
+// over Tailscale, saved stretches upload by themselves and TARS cuts the clip.
+const VERSION = '0.3.0';
 const $ = s => document.querySelector(s);
 
 // ---------- settings ----------
@@ -153,7 +158,7 @@ function openDb() {
       d.createObjectStore('seg', { keyPath: 'id' });      // segment metadata, id = start time (ms)
       d.createObjectStore('blob');                         // segment video, same key
       d.createObjectStore('gps', { keyPath: 't' });
-      d.createObjectStore('saves', { keyPath: 'id' });     // {id, from, to, reason, g}
+      d.createObjectStore('saves', { keyPath: 'id' });     // {id, from, to, reason, g, rid, note, reg, acked, sent, done}
       d.createObjectStore('log', { autoIncrement: true });
     };
     q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error);
@@ -161,12 +166,20 @@ function openDb() {
 }
 
 const S = { segs: [], saves: [], log: [] };     // in-memory mirrors of the small stores
+let quota = Infinity;
 const used = () => S.segs.reduce((a, s) => a + s.size, 0);
+const capBytes = () => Math.min(CFG.capGB * 1e9, quota * 0.8);
 const isLocked = s => S.saves.some(v => s.id < v.to && s.end > v.from);
+async function refreshQuota() { try { const e = await navigator.storage.estimate(); if (e.quota) quota = e.quota; } catch {} }
+async function getBlob(s) {
+  const v = await P(store('blob').get(s.id));
+  return !v ? null : v instanceof Blob ? v : new Blob([v], { type: s.mime || 'video/mp4' });
+}
 
 // ---------- log ----------
 const two = n => String(n).padStart(2, '0');
 const hms = t => { const d = new Date(t); return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`; };
+const hm = t => hms(t).slice(0, 5);
 const ymd = t => { const d = new Date(t); return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`; };
 const mb = b => b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : (b / 1e6).toFixed(1) + ' MB';
 function log(msg) {
@@ -179,58 +192,94 @@ window.addEventListener('error', e => log('JS error: ' + e.message));
 window.addEventListener('unhandledrejection', e => log('JS rejection: ' + (e.reason && e.reason.message || e.reason)));
 
 // ---------- recorder ----------
-const R = { on: false, stream: null, cur: null, mime: '', started: 0, lastEnd: 0, armTimer: 0 };
+// Normally the next segment starts before the current one stops, so the files overlap slightly and nothing is lost.
+// If this phone won't run two recorders at once, R.seq switches to one at a time (a short gap at each change).
+const R = { on: false, starting: false, stream: null, cur: null, wait: null, mime: '', started: 0, lastEnd: 0, armTimer: 0,
+            seq: false, empty: 0, ab: false, fails: [], writing: 0 };
 function pickMime() {
   if (!window.MediaRecorder) return null;
   for (const m of ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'])
     if (MediaRecorder.isTypeSupported(m)) return m;
   return '';
 }
+function liveTrack() { const t = R.stream && R.stream.getVideoTracks()[0]; return t && t.readyState === 'live' ? t : null; }
 async function getStream() {
   const h = +CFG.height, w = Math.round(h * 16 / 9);
   return navigator.mediaDevices.getUserMedia({ audio: false,
     video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: +CFG.fps, max: +CFG.fps } } });
 }
 function startSeg() {
+  if (!liveTrack()) return null;
   const opts = { videoBitsPerSecond: CFG.kbps * 1000 }; if (R.mime) opts.mimeType = R.mime;
-  const r = new MediaRecorder(R.stream, opts);
-  const seg = { r, t0: Date.now(), t1: 0, parts: [] };
+  let r;
+  try { r = new MediaRecorder(R.stream, opts); } catch (e) { failed('create', e); return null; }
+  const seg = { r, t0: Date.now(), t1: 0, parts: [], failed: false };
   r.ondataavailable = e => { if (e.data && e.data.size) seg.parts.push(e.data); };
   r.onstop = () => finishSeg(seg);
-  r.onerror = e => log('recorder error: ' + ((e.error && e.error.name) || e.name || e));
-  r.start();
+  r.onerror = e => { seg.failed = true; log('recorder error: ' + ((e.error && e.error.name) || e.name || e)); };
+  try { r.start(); } catch (e) { failed('start', e); return null; }
   return seg;
 }
-function endSeg(seg) { if (!seg || seg.r.state === 'inactive') return; seg.t1 = Date.now(); seg.r.stop(); }
-// Start the next segment before stopping the current one, so there is no gap between files.
+function failed(what, e) {
+  log(`recorder ${what} failed: ${e.name} ${e.message}`);
+  const now = Date.now(); R.fails = R.fails.filter(t => now - t < 30000); R.fails.push(now);
+  if (R.fails.length >= 5 && R.on) { log('recorder keeps failing, stopping'); toast('Recorder keeps failing: tap Start again'); stop(); }
+}
+function endSeg(seg) {
+  if (!seg || seg.r.state === 'inactive') return;
+  seg.t1 = Date.now();
+  try { seg.r.stop(); } catch (e) { log('recorder stop failed: ' + e.message); }
+}
 function rotate() {
   const old = R.cur;
-  try { R.cur = startSeg(); } catch (e) { log('overlap start failed, falling back: ' + e.message); R.cur = null; }
+  if (!R.seq) {
+    const next = startSeg();
+    if (next) { R.cur = next; endSeg(old); return; }
+    R.seq = true; log('second recorder would not start: recording one segment at a time');
+  }
+  R.cur = null; R.wait = old;                       // the next one starts when this one has finished stopping
+  old.r.addEventListener('stop', () => { if (R.wait === old) R.wait = null; if (R.on && !R.cur && !R.wait) R.cur = startSeg(); }, { once: true });
   endSeg(old);
-  if (!R.cur) old.r.addEventListener('stop', () => { if (R.on && !R.cur) R.cur = startSeg(); });
 }
 async function finishSeg(seg) {
   const blob = new Blob(seg.parts, { type: seg.r.mimeType || R.mime || 'video/mp4' });
-  if (!blob.size) { log('empty segment dropped'); return; }
+  if (!blob.size) {
+    log('empty segment dropped' + (seg.failed ? ' after a recorder error' : ''));
+    if (++R.empty >= 2 && !R.seq) { R.seq = true; log('repeated empty segments: recording one segment at a time'); }
+    return;
+  }
+  R.empty = 0;
   const meta = { id: seg.t0, end: seg.t1 || Date.now(), size: blob.size, mime: blob.type };
   meta.locked = isLocked(meta);
   const gap = R.lastEnd ? seg.t0 - R.lastEnd : 0;
-  R.lastEnd = meta.end;
-  try {
-    const t = db.transaction(['seg', 'blob'], 'readwrite');
-    t.objectStore('seg').put(meta); t.objectStore('blob').put(blob, meta.id);
-    await done(t);
-  } catch (e) {
-    log(`segment write FAILED (${mb(blob.size)}): ${e.name} ${e.message}`);
-    await prune(used() * 0.9);
-    return;
-  }
-  S.segs.push(meta);
+  R.lastEnd = Math.max(R.lastEnd, meta.end);
+  R.writing++;
+  const ok = await writeSeg(meta, blob);
+  if (ok) { S.segs.push(meta); S.segs.sort((a, b) => a.id - b.id); }
+  R.writing--;
+  if (!ok) return;
   if (gap > 400) log(`gap of ${(gap / 1000).toFixed(1)} s before segment ${hms(meta.id)}`);
   const secs = (meta.end - meta.id) / 1000;
   if (Math.abs(secs - CFG.segSec) > 2 || S.segs.length % 30 === 1) log(`segment ${hms(meta.id)} ${secs.toFixed(1)} s ${mb(meta.size)}${meta.locked ? ' locked' : ''}`);
-  await prune(CFG.capGB * 1e9);
+  await prune(capBytes());
   ui();
+}
+async function writeSeg(meta, blob) {
+  for (;;) {
+    const data = R.ab ? await blob.arrayBuffer() : blob;   // read before the transaction: awaiting inside one would end it
+    const t = db.transaction(['seg', 'blob'], 'readwrite');
+    try {
+      t.objectStore('seg').put(meta); t.objectStore('blob').put(data, meta.id);
+      await done(t);
+      return true;
+    } catch (e) {
+      try { t.abort(); } catch {}
+      if (e && e.name === 'DataCloneError' && !R.ab) { R.ab = true; log('storing video as raw data instead of Blob'); continue; }
+      log(`segment write FAILED (${mb(blob.size)}): ${e && e.name} ${e && e.message}`);
+      await refreshQuota(); await prune(Math.min(capBytes(), used() * 0.9));
+      return false;
+    }
+  }
 }
 async function prune(cap) {
   let total = used(); if (total <= cap) return;
@@ -246,30 +295,36 @@ async function prune(cap) {
 }
 
 async function start() {
-  if (R.on) return;
-  const motion = askMotion();                       // both prompts must start inside the tap
-  let stream;
-  try { stream = await getStream(); } catch (e) { toast('Camera blocked: ' + e.name); log('camera error: ' + e.name + ' ' + e.message); return; }
-  await motion;
-  R.mime = pickMime();
-  if (R.mime === null) { toast('This browser cannot record video'); log('no MediaRecorder'); stream.getTracks().forEach(t => t.stop()); return; }
-  R.stream = stream; watchTrack();
-  $('#cam').srcObject = stream;
-  R.on = true; R.started = Date.now(); R.lastEnd = 0;
-  R.cur = startSeg();
-  gpsOn(); wakeOn();
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => log('persistent storage: ' + p)).catch(() => {});
-  const st = stream.getVideoTracks()[0].getSettings();
-  log(`START v${VERSION} ${st.width}x${st.height}@${st.frameRate ? Math.round(st.frameRate) : '?'} ${R.mime || 'default'} ${CFG.kbps}kbps seg ${CFG.segSec}s`);
-  ui();
+  if (R.on || R.starting) return;
+  R.starting = true;
+  try {
+    const motion = askMotion();                     // both prompts must start inside the tap
+    let stream;
+    try { stream = await getStream(); } catch (e) { toast('Camera blocked: ' + e.name); log('camera error: ' + e.name + ' ' + e.message); return; }
+    await motion;
+    R.mime = pickMime();
+    if (R.mime === null) { toast('This browser cannot record video'); log('no MediaRecorder'); stream.getTracks().forEach(t => t.stop()); return; }
+    if (R.stream && R.stream !== stream) R.stream.getTracks().forEach(t => t.stop());
+    R.stream = stream; watchTrack();
+    $('#cam').srcObject = stream;
+    Object.assign(R, { on: true, started: Date.now(), lastEnd: 0, empty: 0, wait: null, fails: [] });
+    R.cur = startSeg();
+    if (!R.cur) { toast('Recorder would not start'); R.on = false; stream.getTracks().forEach(t => t.stop()); R.stream = null; return; }
+    gpsOn(); wakeOn(); refreshQuota();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => log('persistent storage: ' + p)).catch(() => {});
+    const st = stream.getVideoTracks()[0].getSettings();
+    log(`START v${VERSION} ${st.width}x${st.height}@${st.frameRate ? Math.round(st.frameRate) : '?'} ${R.mime || 'default'} ${CFG.kbps}kbps seg ${CFG.segSec}s`);
+    syncSoon();
+  } finally { R.starting = false; ui(); }
 }
 function stop() {
   if (!R.on) return;
   R.on = false; endSeg(R.cur); R.cur = null;
-  setTimeout(() => { if (!R.on && R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; $('#cam').srcObject = null; } }, 1500);
+  const s = R.stream;
+  setTimeout(() => { if (!R.on && s && R.stream === s) { s.getTracks().forEach(t => t.stop()); R.stream = null; $('#cam').srcObject = null; } }, 1500);
   gpsOff(); wakeOff();
   log(`STOP after ${Math.round((Date.now() - R.started) / 60000)} min`);
-  ui();
+  ui(); syncSoon();
 }
 function watchTrack() {
   const tr = R.stream.getVideoTracks()[0];
@@ -285,27 +340,40 @@ document.addEventListener('visibilitychange', async () => {
     if (R.on) { endSeg(R.cur); R.cur = null; log('app hidden, recording paused'); }
     return;
   }
+  syncSoon();
   if (!R.on) return;
   log(`app visible again after ${((Date.now() - hiddenAt) / 1000).toFixed(1)} s`);
-  const tr = R.stream && R.stream.getVideoTracks()[0];
-  if (!tr || tr.readyState === 'ended') {
-    try { R.stream = await getStream(); watchTrack(); $('#cam').srcObject = R.stream; log('camera reopened'); }
-    catch (e) { log('camera reopen failed: ' + e.name); toast('Camera lost: tap Start'); R.on = false; ui(); return; }
+  if (!liveTrack()) {
+    try {
+      const s = await getStream();
+      if (R.stream) R.stream.getTracks().forEach(t => t.stop());
+      R.stream = s; watchTrack(); $('#cam').srcObject = s; log('camera reopened');
+    } catch (e) { log('camera reopen failed: ' + e.name); toast('Camera lost: tap Start'); R.on = false; ui(); return; }
   }
-  if (!R.cur) R.cur = startSeg();
+  if (!R.cur && !R.wait) R.cur = startSeg();
   wakeOn();
 });
 
 // ---------- saves ----------
+async function putSave(v) { try { await P(store('saves', 'readwrite').put(v)); } catch (e) { log('save write failed: ' + e.message); } }
+async function addSave(v) {
+  while (S.saves.some(x => x.id === v.id)) v.id++;  // the store is keyed by time
+  S.saves.push(v); await putSave(v); await relock();
+}
 async function save(reason, t = Date.now(), g) {
-  const v = { id: t, from: t - CFG.before * 1000, to: t + CFG.after * 1000, reason };
+  const v = { id: t, from: t - CFG.before * 1000, to: t + CFG.after * 1000, reason, rid: 'p' + t };
   if (g) v.g = +g.toFixed(2);
-  S.saves.push(v);
-  await P(store('saves', 'readwrite').put(v));
-  await relock();
+  await addSave(v);
   flash(); toast(reason === 'impact' ? `Impact ${v.g} g: saved` : `Saved: ${CFG.before} s before, ${CFG.after} s after`);
   log(`SAVE ${reason}${g ? ' ' + v.g + 'g' : ''} ${hms(v.from)}–${hms(v.to)}`);
-  ui();
+  ui(); syncSoon();
+}
+async function remoteSave(q) {                      // "save that" sent to TARS, arriving through the PC (times in PC clock)
+  const v = { id: Math.round(q.ms - PC.off), from: Math.round(q.from - PC.off), to: Math.round(q.to - PC.off), reason: 'tars', rid: q.id, note: q.note || '', reg: true };
+  await addSave(v);
+  flash(); toast('TARS: saving that');
+  log(`TARS mark ${q.id}${v.note ? ' "' + v.note + '"' : ''} ${hms(v.from)}–${hms(v.to)}`);
+  ack(v); ui();
 }
 async function relock() {
   const t = db.transaction('seg', 'readwrite'), os = t.objectStore('seg');
@@ -318,8 +386,94 @@ async function unsave(id) {
   await relock(); log('save removed ' + hms(id));
 }
 
+// ---------- link to TARS (PC over Tailscale) ----------
+const PC = { ok: false, off: 0, seen: 0, err: '', rtt: 0 };
+const U = { busy: false, cur: '' };
+const pcUrl = () => { try { return localStorage.getItem('dashcam.pc') || ''; } catch { return ''; } };
+function pcBase() { let u = pcUrl().trim(); if (!u) return ''; if (!/^https?:\/\//i.test(u)) u = 'https://' + u; return u.replace(/\/+$/, ''); }
+async function api(path, opts = {}, timeout = 15000) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const r = await fetch(pcBase() + path, { ...opts, signal: ctl.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('PC said ' + r.status);
+    return await r.json();
+  } catch (e) { throw e.name === 'AbortError' ? new Error('timed out') : e; }
+  finally { clearTimeout(tm); }
+}
+const json = body => ({ method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+async function ack(v) {
+  try { await api('/api/ack?mark=' + encodeURIComponent(v.rid), { method: 'POST' }); v.acked = true; await putSave(v); } catch {}
+}
+async function poll() {
+  const t0 = Date.now();
+  const j = await api(`/api/poll?rec=${R.on ? 1 : 0}&v=${VERSION}`, {}, 8000);
+  const t1 = Date.now();
+  PC.rtt = t1 - t0;
+  if (PC.rtt < 2000 || !PC.seen) PC.off = j.now - (t0 + t1) / 2;    // only a quick round trip gives a good clock reading
+  if (!PC.ok) log(`linked to PC (${PC.rtt} ms, PC clock ${PC.off >= 0 ? '+' : ''}${(PC.off / 1000).toFixed(2)} s)`);
+  PC.ok = true; PC.seen = t1; PC.err = '';
+  for (const q of j.requests || []) {
+    const have = S.saves.find(v => v.rid === q.id);
+    if (!have) await remoteSave(q); else if (!have.acked) ack(have);
+  }
+}
+async function registerLocal() {                    // saves made on the phone, so the PC knows to expect them
+  for (const v of S.saves) {
+    if (v.reg || v.reason === 'tars') continue;
+    await api('/api/save', json({ id: v.rid, ms: Math.round(v.id + PC.off), from: Math.round(v.from + PC.off), to: Math.round(v.to + PC.off), reason: v.reason, g: v.g }));
+    v.reg = true; await putSave(v);
+  }
+}
+function uploadable(v) {
+  if (!v.reg || v.done || Date.now() < v.to + 1500) return false;
+  if (S.segs.some(s => s.end >= v.to)) return true; // the segment holding the end of the window is stored
+  if (R.cur && R.cur.t0 < v.to) return false;      // ...or still recording
+  return !R.wait && !R.writing;                     // ...or still being saved; otherwise recording stopped before the end
+}
+async function uploadNext() {
+  if (U.busy || !PC.ok) return;
+  const v = S.saves.filter(uploadable).sort((a, b) => a.id - b.id)[0];
+  if (!v) return;
+  U.busy = true;
+  let sent = false;
+  try {
+    const segs = segsFor(v.from, v.to), q = `mark=${encodeURIComponent(v.rid)}&off=${Math.round(PC.off)}`;
+    v.sent = v.sent || [];
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (v.sent.includes(s.id) || s.up) continue;  // s.up: already on the PC for an overlapping save
+      U.cur = `${i + 1}/${segs.length}`; ui();
+      const b = await getBlob(s);
+      if (!b) { log('missing video for segment ' + hms(s.id)); continue; }
+      await api(`/api/seg?${q}&id=${s.id}&end=${s.end}`, { method: 'PUT', headers: { 'Content-Type': s.mime || 'video/mp4' }, body: b }, 180000);
+      v.sent.push(s.id); await putSave(v);
+      s.up = true; try { await P(store('seg', 'readwrite').put(s)); } catch {}
+    }
+    if (segs.length) {
+      const pts = await P(store('gps').getAll(IDBKeyRange.bound(v.from - 5000, v.to + 5000)));
+      if (pts.length) await api(`/api/gps?${q}`, json({ points: pts }));
+    }
+    await api(`/api/done?${q}&n=${segs.length}`, { method: 'POST' });
+    v.done = true; await putSave(v); sent = true;
+    log(`uploaded ${v.rid}: ${segs.length} parts, ${mb(segs.reduce((a, s) => a + s.size, 0))}`);
+  } catch (e) { log(`upload ${v.rid} paused: ${e.message}`); }
+  finally { U.busy = false; U.cur = ''; ui(); }
+  if (sent) syncSoon();                             // more to send? go again straight away (after a failure, the normal poll retries)
+}
+let pollTimer = 0, polling = false;
+async function syncLoop() {
+  clearTimeout(pollTimer);
+  if (polling) return;
+  if (!pcBase() || document.visibilityState === 'hidden') { PC.ok = false; ui(); pollTimer = setTimeout(syncLoop, 5000); return; }
+  polling = true;
+  try { await poll(); await registerLocal(); uploadNext(); }
+  catch (e) { if (PC.ok || !PC.err) log('PC link down: ' + e.message); PC.ok = false; PC.err = e.message; }
+  finally { polling = false; ui(); pollTimer = setTimeout(syncLoop, R.on ? 3000 : 15000); }
+}
+function syncSoon() { if (!polling) { clearTimeout(pollTimer); pollTimer = setTimeout(syncLoop, 300); } }
+
 // ---------- motion ----------
-const M = { peak: 0, last: 0, minutePeak: 0, ok: false };
+const M = { last: 0, minutePeak: 0, ok: false, sideways: 0 };
 async function askMotion() {
   if (M.ok || !window.DeviceMotionEvent) return;
   try {
@@ -331,11 +485,17 @@ async function askMotion() {
   } catch (e) { log('motion permission error: ' + e.message); }
 }
 function onMotion(e) {
-  let g; const a = e.acceleration;
+  let g; const a = e.acceleration, b = e.accelerationIncludingGravity;
   if (a && a.x != null) g = Math.hypot(a.x, a.y, a.z) / 9.81;
-  else { const b = e.accelerationIncludingGravity; if (!b || b.x == null) return; g = Math.abs(Math.hypot(b.x, b.y, b.z) / 9.81 - 1); }
+  else if (b && b.x != null) g = Math.abs(Math.hypot(b.x, b.y, b.z) / 9.81 - 1);
+  else return;
   if (g > M.minutePeak) M.minutePeak = g;
   if (R.on && g >= CFG.impactG && Date.now() - M.last > 15000) { M.last = Date.now(); save('impact', Date.now(), g); }
+  // Phone lying sideways while the screen stays portrait means Portrait Orientation Lock is on.
+  if (b && b.x != null) {
+    const sideways = Math.abs(b.x) > 7 && Math.abs(b.y) < 5 && window.innerHeight > window.innerWidth;
+    M.sideways = sideways ? (M.sideways || Date.now()) : 0;
+  }
 }
 
 // ---------- GPS ----------
@@ -365,10 +525,13 @@ function flash() { const f = $('#flash'); f.classList.add('on'); requestAnimatio
 function ui() {
   document.body.classList.toggle('rec', R.on);
   $('#state').textContent = R.on ? 'REC' : 'Ready';
-  $('#go').textContent = R.on ? 'Stop' : 'Start';
+  if (!$('#go').classList.contains('arm')) $('#go').textContent = R.on ? 'Stop' : 'Start';
   $('#save').disabled = !R.on;
   const locked = S.segs.filter(s => s.locked).reduce((a, s) => a + s.size, 0);
-  $('#store').textContent = `${mb(used())} of ${CFG.capGB} GB · saved ${mb(locked)}`;
+  $('#store').textContent = `${mb(used())} of ${mb(capBytes())} · saved ${mb(locked)}`;
+  const l = $('#link');
+  l.className = !pcBase() ? '' : PC.ok ? 'ok' : 'bad';
+  l.textContent = !pcBase() ? '' : PC.ok ? (U.busy ? `TARS ↑${U.cur}` : 'TARS ✓') : 'TARS ✗';
 }
 function tick() {
   const now = Date.now();
@@ -377,13 +540,24 @@ function tick() {
   const f = G.fix, age = f ? now - f.t : Infinity;  // a parked phone may go quiet, so the fix stays good for 30 s
   $('#spd').textContent = age < 5000 && f.spd != null && f.spd >= 0 ? Math.round(f.spd * 3.6) : '–';
   $('#gps').textContent = age < 30000 ? `GPS ±${f.acc} m` : (R.on ? 'GPS searching' : 'GPS –');
-  if (R.on && R.cur && now - R.cur.t0 >= CFG.segSec * 1000) rotate();
-  if (R.on && !R.cur && document.visibilityState === 'visible') R.cur = startSeg();
+  if (R.on) {
+    if (R.wait && now - R.wait.t1 > 4000) { log('recorder slow to stop, moving on'); R.wait = null; }
+    if (R.cur && (R.cur.failed || R.cur.r.state === 'inactive')) {
+      log('recorder stopped by itself, restarting'); const dead = R.cur; R.cur = null; endSeg(dead);
+      const t = Date.now(); R.fails = R.fails.filter(x => t - x < 30000); R.fails.push(t);
+      if (R.fails.length >= 5) { toast('Recorder keeps failing: tap Start again'); stop(); return; }
+    }
+    if (R.cur && now - R.cur.t0 >= CFG.segSec * 1000) rotate();
+    if (!R.cur && !R.wait && document.visibilityState === 'visible') R.cur = startSeg();
+  }
   const tr = R.on && R.stream && R.stream.getVideoTracks()[0];
-  $('#alert').textContent = tr && tr.readyState === 'ended' ? 'Camera stopped' : (tr && tr.muted ? 'Camera paused' : '');
+  $('#alert').textContent = tr && tr.readyState === 'ended' ? 'Camera stopped'
+    : tr && tr.muted ? 'Camera paused'
+    : R.on && M.sideways && now - M.sideways > 3000 ? 'Turn off Portrait Orientation Lock' : '';
 }
 setInterval(tick, 500);
 setInterval(() => { if (R.on && M.ok) log(`motion peak last minute ${M.minutePeak.toFixed(2)} g`); M.minutePeak = 0; }, 60000);
+setInterval(refreshQuota, 300000);
 
 // ---------- controls ----------
 $('#go').addEventListener('click', () => {
@@ -415,18 +589,26 @@ const urls = []; const revokeAll = () => { while (urls.length) URL.revokeObjectU
 const segsFor = (from, to) => S.segs.filter(s => s.id < to && s.end > from);
 const ready = new Map();                            // key -> File[] prepared for sharing (iOS needs the tap to share directly)
 const stamp = t => { const d = new Date(t); return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; };
-const hm = t => hms(t).slice(0, 5);
 // File names carry the segment's start to the millisecond (phone local time); the PC side cuts clips from them.
 async function filesFor(segs) {
-  const files = await Promise.all(segs.map(async s => {
-    const b = await P(store('blob').get(s.id));
+  const files = [];
+  for (const s of segs) {
+    const b = await getBlob(s); if (!b) continue;
     const ext = (s.mime || '').includes('webm') ? 'webm' : 'mp4';
-    return new File([b], `dashcam_${stamp(s.id)}-${String(s.id % 1000).padStart(3, '0')}.${ext}`, { type: s.mime || 'video/mp4' });
-  }));
+    files.push(new File([b], `dashcam_${stamp(s.id)}-${String(s.id % 1000).padStart(3, '0')}.${ext}`, { type: s.mime || 'video/mp4' }));
+  }
   const from = segs[0].id, to = segs[segs.length - 1].end;
   const pts = await P(store('gps').getAll(IDBKeyRange.bound(from - 5000, to + 5000)));
   if (pts.length) files.push(new File([JSON.stringify({ from, to, points: pts })], `dashcam_gps_${stamp(from)}.json`, { type: 'application/json' }));
   return files;
+}
+async function shareFiles(files, what) {
+  const can = f => navigator.canShare && navigator.canShare({ files: f });
+  const vids = files.filter(f => !f.name.includes('_gps_'));
+  const set = can(files) ? files : can(vids) ? vids : null;   // some systems refuse the GPS file; the video matters most
+  if (set) { await navigator.share({ files: set }); log(`shared ${set.length} files (${what})`); return; }
+  for (const f of files) { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+  log(`downloaded ${files.length} files (${what})`);
 }
 function renderClips() {
   const L = $('#cliplist'); L.innerHTML = '';
@@ -442,12 +624,7 @@ function renderClips() {
       btn('Play', () => play(title, segs));
       btn(ready.has(key) ? 'Share now' : 'Share', async b => {
         if (ready.has(key)) {
-          const files = ready.get(key);
-          try {
-            if (navigator.canShare && navigator.canShare({ files })) await navigator.share({ files, title });
-            else files.forEach(f => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); });
-            log(`shared ${files.length} files (${title})`);
-          } catch (e) { if (e.name !== 'AbortError') log('share failed: ' + e.message); }
+          try { await shareFiles(ready.get(key), title); } catch (e) { if (e.name !== 'AbortError') log('share failed: ' + e.message); }
           return;
         }
         b.textContent = 'Preparing…';
@@ -459,13 +636,14 @@ function renderClips() {
     L.appendChild(d);
   };
   const saves = S.saves.slice().sort((a, b) => b.id - a.id);
-  if (!saves.length) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'No saved clips yet. Tap SAVE while recording, or a hard knock saves one automatically.'; L.appendChild(p); }
+  if (!saves.length) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'No saved clips yet. Tap SAVE while recording, tell TARS "save that", or a hard knock saves one automatically.'; L.appendChild(p); }
   for (const v of saves) {
-    const why = v.reason === 'impact' ? `Impact ${v.g} g` : v.reason === 'button' ? 'Save button' : v.reason;
-    add('save' + v.id, `${ymd(v.id)} ${hms(v.id)}`, why + (Date.now() < v.to ? ' · still recording' : ''), segsFor(v.from, v.to),
+    const why = v.reason === 'impact' ? `Impact ${v.g} g` : v.reason === 'button' ? 'Save button' : v.reason === 'tars' ? 'TARS' + (v.note ? `: ${v.note}` : '') : v.reason;
+    const where = Date.now() < v.to ? 'still recording' : !pcBase() ? '' : v.done ? 'on the PC ✓' : 'waiting to upload';
+    add('save' + v.id, `${ymd(v.id)} ${hms(v.id)}`, why + (where ? ' · ' + where : ''), segsFor(v.from, v.to),
       btn => btn('Delete', async () => { await unsave(v.id); ready.delete('save' + v.id); renderClips(); ui(); }));
   }
-  // All footage, newest drive first, in 5-minute blocks so the bit around a TARS mark can be sent on its own.
+  // All footage, newest drive first, in 5-minute blocks so a stretch can be sent on its own.
   const drives = [];
   for (const s of S.segs) {
     const d = drives[drives.length - 1];
@@ -479,16 +657,17 @@ function renderClips() {
     for (const s of d.segs) { const b = Math.floor(s.id / 300000) * 300000; if (!blocks.has(b)) blocks.set(b, []); blocks.get(b).push(s); }
     for (const [b, segs] of [...blocks].reverse()) add('blk' + b, `${hm(b)}–${hm(b + 300000)}`, segs.some(s => s.locked) ? 'has saved parts' : 'footage', segs);
   }
-  const all = S.segs; const p = document.createElement('p'); p.className = 'muted';
-  p.textContent = all.length ? `Stored: ${mb(used())} in ${all.length} parts, from ${ymd(all[0].id)} ${hms(all[0].id)}. Limit ${CFG.capGB} GB. App v${VERSION}.` : `Nothing stored yet. App v${VERSION}.`;
+  const p = document.createElement('p'); p.className = 'muted';
+  p.textContent = (S.segs.length ? `Stored: ${mb(used())} in ${S.segs.length} parts, from ${ymd(S.segs[0].id)} ${hms(S.segs[0].id)}.` : 'Nothing stored yet.')
+    + ` Limit ${mb(capBytes())}.` + (quota < Infinity ? ` iOS allows this app ${mb(quota)}.` : '') + ` App v${VERSION}.`;
   L.appendChild(p);
-  if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { p.textContent += ` Browser allows ${mb(e.quota || 0)}.`; }).catch(() => {});
 }
 async function play(title, segs) {
   openSheet('playsheet'); $('#playtitle').textContent = title;
   const p = $('#player'); let i = 0;
   const load = async () => {
-    const b = await P(store('blob').get(segs[i].id)); revokeAll();
+    const b = await getBlob(segs[i]); revokeAll();
+    if (!b) { $('#playinfo').textContent = 'This part is missing.'; return; }
     const u = URL.createObjectURL(b); urls.push(u); p.src = u; p.play().catch(() => {});
     $('#playinfo').textContent = `Part ${i + 1} of ${segs.length} · ${hms(segs[i].id)}`;
   };
@@ -499,6 +678,29 @@ async function play(title, segs) {
 // ---------- settings + log ----------
 function renderSettings() {
   const L = $('#setlist'); L.innerHTML = '';
+  const box = document.createElement('div'); box.className = 'row';
+  box.innerHTML = `<div class="t">TARS link</div>
+    <div class="muted">Your PC's Tailscale name, ending in .ts.net. In the Tailscale app, tap the PC and copy its name. Tailscale must be on (VPN) for the link to work.</div>
+    <input id="pcurl" class="wide" type="text" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" placeholder="pc-name.tailnet.ts.net">
+    <div class="acts"><button id="pctest" class="hot">Save + test</button></div><div id="pcres" class="muted"></div>`;
+  L.appendChild(box);
+  $('#pcurl').value = pcUrl();
+  $('#pcres').textContent = !pcBase() ? 'Not linked.' : PC.ok ? `Linked ✓ (${PC.rtt} ms, PC clock ${(PC.off / 1000).toFixed(2)} s from the phone's)` : 'Not reachable right now' + (PC.err ? `: ${PC.err}` : '');
+  $('#pctest').addEventListener('click', async () => {
+    try { localStorage.setItem('dashcam.pc', $('#pcurl').value.trim()); } catch {}
+    const r = $('#pcres');
+    if (!pcBase()) { r.textContent = 'Link removed.'; PC.ok = false; ui(); return; }
+    r.textContent = 'Testing…';
+    try {
+      const t0 = Date.now(), j = await api('/api/hello', {}, 10000), t1 = Date.now();
+      r.textContent = `Linked ✓ ${t1 - t0} ms, PC clock ${((j.now - (t0 + t1) / 2) / 1000).toFixed(2)} s from the phone's.`;
+      log(`link test ok: ${pcBase()} ${t1 - t0} ms`);
+    } catch (e) {
+      r.textContent = `Can't reach the PC (${e.message}). Check the Tailscale VPN is on and the name is right.`;
+      log(`link test failed: ${pcBase()} ${e.message}`);
+    }
+    syncSoon();
+  });
   for (const [k, name, unit, help, min, max] of SETTINGS) {
     const l = document.createElement('label'); l.className = 'set';
     l.innerHTML = `<span></span><input type="number" inputmode="decimal">`;
@@ -508,14 +710,13 @@ function renderSettings() {
     L.appendChild(l);
   }
   const n = document.createElement('p'); n.className = 'muted';
-  n.textContent = 'Resolution, frame rate and bitrate apply the next time you tap Start. Keep Auto-Lock on Never so the screen stays on.';
+  n.textContent = 'Resolution, frame rate and bitrate apply the next time you tap Start. Keep Auto-Lock on Never so the screen stays on, Portrait Orientation Lock off, and Do Not Disturb on so a call doesn\'t take over the screen.';
   L.appendChild(n);
 }
 function renderLog() { $('#logtxt').textContent = S.log.slice(-400).reverse().join('\n'); }
 $('#sharelog').addEventListener('click', async () => {
   const f = new File([S.log.join('\n')], `dashcam_log_${stamp(Date.now())}.txt`, { type: 'text/plain' });
-  try { if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f] }); else { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); } }
-  catch (e) { if (e.name !== 'AbortError') log('log share failed: ' + e.message); }
+  try { await shareFiles([f], 'log'); } catch (e) { if (e.name !== 'AbortError') log('log share failed: ' + e.message); }
 });
 
 // ---------- boot ----------
@@ -524,13 +725,15 @@ $('#sharelog').addEventListener('click', async () => {
     db = await openDb();
     S.segs = (await P(store('seg').getAll())).sort((a, b) => a.id - b.id);
     S.saves = await P(store('saves').getAll());
+    for (const v of S.saves) if (!v.rid && v.reason !== 'tars') { v.rid = 'p' + v.id; await putSave(v); }   // saves from v0.1/v0.2
     const keys = await P(store('log').getAllKeys());
     if (keys.length > 5000) { const t = db.transaction('log', 'readwrite'); keys.slice(0, keys.length - 4000).forEach(k => t.objectStore('log').delete(k)); await done(t); }
     S.log = (await P(store('log').getAll())).slice(-1000);
     if (S.segs.length) await P(store('gps', 'readwrite').delete(IDBKeyRange.upperBound(S.segs[0].id - 3600e3)));
   } catch (e) { toast('Storage unavailable: ' + e.message); }
-  log(`app opened v${VERSION}, ${S.segs.length} segments, ${S.saves.length} saves${navigator.standalone ? ', home screen app' : ''}`);
-  ui(); tick();
+  await refreshQuota();
+  log(`app opened v${VERSION}, ${S.segs.length} segments, ${S.saves.length} saves${navigator.standalone ? ', home screen app' : ''}${pcBase() ? ', linked to ' + pcBase() : ''}`);
+  ui(); tick(); syncLoop();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => log('service worker: ' + e.message));
 })();
 </script>
