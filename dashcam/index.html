@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dash Cam">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Dash Cam</title>
+<style>
+:root {
+  --bg: #000; --panel: #15181c; --line: #2a2f36; --ink: #eef1f4; --dim: #9aa3ad;
+  --rec: #ff3b30; --save: #ffb020; --ok: #34c759; --accent: #4aa8ff;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+  font: 16px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-user-select: none; user-select: none; }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+#cam { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+#shade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .3s; }
+body.dim #shade { opacity: .88; }
+#flash { position: fixed; inset: 0; border: 10px solid var(--save); opacity: 0; pointer-events: none; transition: opacity .6s; }
+#flash.on { opacity: 1; transition: none; }
+
+#bar { position: fixed; left: 0; right: 0; top: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px);
+  background: linear-gradient(#000c, #0000); font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
+#bar b { font-weight: 600; }
+#recdot { width: 12px; height: 12px; border-radius: 50%; background: #555; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+body.rec #recdot { background: var(--rec); animation: blink 1.2s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+#spd { font-size: 26px; font-weight: 700; }
+.muted { color: var(--dim); }
+.warn { color: var(--save); }
+
+#ctl { position: fixed; display: flex; gap: 12px; align-items: center; justify-content: center;
+  left: 0; right: 0; bottom: 0; padding: 12px calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 12px);
+  background: linear-gradient(#0000, #000c); }
+@media (orientation: landscape) {
+  #ctl { left: auto; top: 0; flex-direction: column; padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 12px) 12px;
+    background: linear-gradient(90deg, #0000, #000c); }
+  #bar { right: 140px; }
+}
+.btn { min-width: 64px; height: 56px; padding: 0 16px; border-radius: 14px; background: #ffffff1f; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-weight: 600; }
+.btn:active { transform: scale(.97); }
+#go { min-width: 96px; background: var(--ok); color: #000; }
+body.rec #go { background: #ffffff26; color: var(--ink); }
+#go.arm { background: var(--rec); color: #fff; }
+#save { width: 108px; height: 108px; border-radius: 50%; background: var(--save); color: #000; font-size: 20px; font-weight: 800; letter-spacing: .02em;
+  box-shadow: 0 0 0 4px #0008; }
+#save:disabled { opacity: .35; }
+
+#toast { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 86vw; padding: 14px 20px; border-radius: 14px;
+  background: #000d; font-size: 20px; font-weight: 600; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#toast.on { opacity: 1; }
+
+.sheet { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 5; }
+.sheet.on { display: flex; }
+.sheet header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; border-bottom: 1px solid var(--line); }
+.sheet header h2 { margin: 0; font-size: 20px; flex: 1; }
+.sheet .body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px calc(env(safe-area-inset-bottom) + 24px); -webkit-user-select: text; user-select: text; }
+.row { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.row .t { font-weight: 600; }
+.row .acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.row .acts button { height: 40px; padding: 0 14px; border-radius: 10px; background: #ffffff14; }
+.row .acts button.hot { background: var(--accent); color: #000; }
+label.set { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+label.set span small { display: block; color: var(--dim); font-size: 13px; }
+label.set input, label.set select { width: 96px; height: 38px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; padding: 0 8px; }
+pre#logtxt { margin: 0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; color: #cfd6dd; }
+#player { width: 100%; max-height: 60vh; background: #000; border-radius: 10px; }
+</style>
+</head>
+<body>
+<video id="cam" autoplay playsinline muted></video>
+<div id="shade"></div>
+<div id="flash"></div>
+
+<div id="bar">
+  <span><span id="recdot"></span><b id="state">Ready</b> <span id="elapsed" class="muted"></span></span>
+  <span id="clock"></span>
+  <span><span id="spd">–</span> <span class="muted">km/h</span></span>
+  <span id="gps" class="muted">GPS –</span>
+  <span id="store" class="muted"></span>
+  <span id="alert" class="warn"></span>
+</div>
+
+<div id="ctl">
+  <button id="save" disabled>SAVE</button>
+  <button id="go" class="btn">Start</button>
+  <button id="dimb" class="btn">Dim</button>
+  <button id="menub" class="btn">Clips</button>
+</div>
+<div id="toast"></div>
+
+<section id="clips" class="sheet">
+  <header><h2>Saved clips</h2><button class="btn" data-open="settings">Settings</button><button class="btn" data-open="logs">Log</button><button class="btn" data-close>Done</button></header>
+  <div class="body" id="cliplist"></div>
+</section>
+
+<section id="playsheet" class="sheet">
+  <header><h2 id="playtitle">Clip</h2><button class="btn" data-close>Done</button></header>
+  <div class="body"><video id="player" controls playsinline></video><p id="playinfo" class="muted"></p></div>
+</section>
+
+<section id="settings" class="sheet">
+  <header><h2>Settings</h2><button class="btn" data-close>Done</button></header>
+  <div class="body" id="setlist"></div>
+</section>
+
+<section id="logs" class="sheet">
+  <header><h2>Log</h2><button class="btn" id="sharelog">Share</button><button class="btn" data-close>Done</button></header>
+  <div class="body"><pre id="logtxt"></pre></div>
+</section>
+
+<script>
+'use strict';
+// Dash Cam: records the back camera in short MP4 segments into IndexedDB, keeps a rolling window of footage,
+// and locks segments around a save (button or impact) so they are never pruned. Upload to TARS comes later.
+const VERSION = '0.1.0';
+const $ = s => document.querySelector(s);
+
+// ---------- settings ----------
+const DEFAULTS = { segSec: 10, before: 20, after: 15, capGB: 8, impactG: 2.5, kbps: 2500, height: 720, fps: 30 };
+const SETTINGS = [
+  ['segSec', 'Segment length', 's', 'Footage is stored in chunks this long', 5, 30],
+  ['before', 'Keep before a save', 's', '15 s plus a few for the time it takes to ask', 5, 120],
+  ['after', 'Keep after a save', 's', '', 0, 120],
+  ['capGB', 'Storage limit', 'GB', 'Oldest unsaved footage is deleted past this', 1, 64],
+  ['impactG', 'Impact trigger', 'g', 'Higher = fewer false saves from potholes', 1, 8],
+  ['kbps', 'Video bitrate', 'kbps', '2500 ≈ 1.1 GB per hour', 800, 8000],
+  ['height', 'Resolution', 'p', '720 or 1080', 480, 1080],
+  ['fps', 'Frame rate', 'fps', '', 10, 30],
+];
+let CFG = { ...DEFAULTS };
+try { Object.assign(CFG, JSON.parse(localStorage.getItem('dashcam.cfg') || '{}')); } catch {}
+function saveCfg() { try { localStorage.setItem('dashcam.cfg', JSON.stringify(CFG)); } catch {} }
+
+// ---------- storage ----------
+let db;
+const P = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+const done = t => new Promise((ok, no) => { t.oncomplete = () => ok(); t.onerror = t.onabort = () => no(t.error); });
+const store = (name, mode = 'readonly') => db.transaction(name, mode).objectStore(name);
+function openDb() {
+  return new Promise((ok, no) => {
+    const q = indexedDB.open('dashcam', 1);
+    q.onupgradeneeded = () => {
+      const d = q.result;
+      d.createObjectStore('seg', { keyPath: 'id' });      // segment metadata, id = start time (ms)
+      d.createObjectStore('blob');                         // segment video, same key
+      d.createObjectStore('gps', { keyPath: 't' });
+      d.createObjectStore('saves', { keyPath: 'id' });     // {id, from, to, reason, g}
+      d.createObjectStore('log', { autoIncrement: true });
+    };
+    q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error);
+  });
+}
+
+const S = { segs: [], saves: [], log: [] };     // in-memory mirrors of the small stores
+const used = () => S.segs.reduce((a, s) => a + s.size, 0);
+const isLocked = s => S.saves.some(v => s.id < v.to && s.end > v.from);
+
+// ---------- log ----------
+const two = n => String(n).padStart(2, '0');
+const hms = t => { const d = new Date(t); return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`; };
+const ymd = t => { const d = new Date(t); return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`; };
+const mb = b => b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : (b / 1e6).toFixed(1) + ' MB';
+function log(msg) {
+  const line = `${ymd(Date.now())} ${hms(Date.now())} ${msg}`;
+  S.log.push(line); if (S.log.length > 1500) S.log.splice(0, 500);
+  try { if (db) store('log', 'readwrite').add(line); } catch {}
+  if ($('#logs').classList.contains('on')) renderLog();
+}
+window.addEventListener('error', e => log('JS error: ' + e.message));
+window.addEventListener('unhandledrejection', e => log('JS rejection: ' + (e.reason && e.reason.message || e.reason)));
+
+// ---------- recorder ----------
+const R = { on: false, stream: null, cur: null, mime: '', started: 0, lastEnd: 0, armTimer: 0 };
+function pickMime() {
+  if (!window.MediaRecorder) return null;
+  for (const m of ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'])
+    if (MediaRecorder.isTypeSupported(m)) return m;
+  return '';
+}
+async function getStream() {
+  const h = +CFG.height, w = Math.round(h * 16 / 9);
+  return navigator.mediaDevices.getUserMedia({ audio: false,
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: +CFG.fps, max: +CFG.fps } } });
+}
+function startSeg() {
+  const opts = { videoBitsPerSecond: CFG.kbps * 1000 }; if (R.mime) opts.mimeType = R.mime;
+  const r = new MediaRecorder(R.stream, opts);
+  const seg = { r, t0: Date.now(), t1: 0, parts: [] };
+  r.ondataavailable = e => { if (e.data && e.data.size) seg.parts.push(e.data); };
+  r.onstop = () => finishSeg(seg);
+  r.onerror = e => log('recorder error: ' + ((e.error && e.error.name) || e.name || e));
+  r.start();
+  return seg;
+}
+function endSeg(seg) { if (!seg || seg.r.state === 'inactive') return; seg.t1 = Date.now(); seg.r.stop(); }
+// Start the next segment before stopping the current one, so there is no gap between files.
+function rotate() {
+  const old = R.cur;
+  try { R.cur = startSeg(); } catch (e) { log('overlap start failed, falling back: ' + e.message); R.cur = null; }
+  endSeg(old);
+  if (!R.cur) old.r.addEventListener('stop', () => { if (R.on && !R.cur) R.cur = startSeg(); });
+}
+async function finishSeg(seg) {
+  const blob = new Blob(seg.parts, { type: seg.r.mimeType || R.mime || 'video/mp4' });
+  if (!blob.size) { log('empty segment dropped'); return; }
+  const meta = { id: seg.t0, end: seg.t1 || Date.now(), size: blob.size, mime: blob.type };
+  meta.locked = isLocked(meta);
+  const gap = R.lastEnd ? seg.t0 - R.lastEnd : 0;
+  R.lastEnd = meta.end;
+  try {
+    const t = db.transaction(['seg', 'blob'], 'readwrite');
+    t.objectStore('seg').put(meta); t.objectStore('blob').put(blob, meta.id);
+    await done(t);
+  } catch (e) {
+    log(`segment write FAILED (${mb(blob.size)}): ${e.name} ${e.message}`);
+    await prune(used() * 0.9);
+    return;
+  }
+  S.segs.push(meta);
+  if (gap > 400) log(`gap of ${(gap / 1000).toFixed(1)} s before segment ${hms(meta.id)}`);
+  const secs = (meta.end - meta.id) / 1000;
+  if (Math.abs(secs - CFG.segSec) > 2 || S.segs.length % 30 === 1) log(`segment ${hms(meta.id)} ${secs.toFixed(1)} s ${mb(meta.size)}${meta.locked ? ' locked' : ''}`);
+  await prune(CFG.capGB * 1e9);
+  ui();
+}
+async function prune(cap) {
+  let total = used(); if (total <= cap) return;
+  const t = db.transaction(['seg', 'blob'], 'readwrite'); let n = 0;
+  for (const s of S.segs.slice()) {
+    if (total <= cap) break;
+    if (s.locked) continue;
+    t.objectStore('seg').delete(s.id); t.objectStore('blob').delete(s.id);
+    total -= s.size; S.segs.splice(S.segs.indexOf(s), 1); n++;
+  }
+  await done(t);
+  if (n) log(`pruned ${n} old segments, now ${mb(total)}`);
+}
+
+async function start() {
+  if (R.on) return;
+  const motion = askMotion();                       // both prompts must start inside the tap
+  let stream;
+  try { stream = await getStream(); } catch (e) { toast('Camera blocked: ' + e.name); log('camera error: ' + e.name + ' ' + e.message); return; }
+  await motion;
+  R.mime = pickMime();
+  if (R.mime === null) { toast('This browser cannot record video'); log('no MediaRecorder'); stream.getTracks().forEach(t => t.stop()); return; }
+  R.stream = stream; watchTrack();
+  $('#cam').srcObject = stream;
+  R.on = true; R.started = Date.now(); R.lastEnd = 0;
+  R.cur = startSeg();
+  gpsOn(); wakeOn();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => log('persistent storage: ' + p)).catch(() => {});
+  const st = stream.getVideoTracks()[0].getSettings();
+  log(`START v${VERSION} ${st.width}x${st.height}@${st.frameRate ? Math.round(st.frameRate) : '?'} ${R.mime || 'default'} ${CFG.kbps}kbps seg ${CFG.segSec}s`);
+  ui();
+}
+function stop() {
+  if (!R.on) return;
+  R.on = false; endSeg(R.cur); R.cur = null;
+  setTimeout(() => { if (!R.on && R.stream) { R.stream.getTracks().forEach(t => t.stop()); R.stream = null; $('#cam').srcObject = null; } }, 1500);
+  gpsOff(); wakeOff();
+  log(`STOP after ${Math.round((Date.now() - R.started) / 60000)} min`);
+  ui();
+}
+function watchTrack() {
+  const tr = R.stream.getVideoTracks()[0];
+  tr.addEventListener('ended', () => log('camera track ended'));
+  tr.addEventListener('mute', () => log('camera track muted'));
+  tr.addEventListener('unmute', () => log('camera track unmuted'));
+}
+// iOS takes the camera away when the app leaves the screen. Close the segment cleanly, then pick up again on return.
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = Date.now();
+    if (R.on) { endSeg(R.cur); R.cur = null; log('app hidden, recording paused'); }
+    return;
+  }
+  if (!R.on) return;
+  log(`app visible again after ${((Date.now() - hiddenAt) / 1000).toFixed(1)} s`);
+  const tr = R.stream && R.stream.getVideoTracks()[0];
+  if (!tr || tr.readyState === 'ended') {
+    try { R.stream = await getStream(); watchTrack(); $('#cam').srcObject = R.stream; log('camera reopened'); }
+    catch (e) { log('camera reopen failed: ' + e.name); toast('Camera lost: tap Start'); R.on = false; ui(); return; }
+  }
+  if (!R.cur) R.cur = startSeg();
+  wakeOn();
+});
+
+// ---------- saves ----------
+async function save(reason, t = Date.now(), g) {
+  const v = { id: t, from: t - CFG.before * 1000, to: t + CFG.after * 1000, reason };
+  if (g) v.g = +g.toFixed(2);
+  S.saves.push(v);
+  await P(store('saves', 'readwrite').put(v));
+  await relock();
+  flash(); toast(reason === 'impact' ? `Impact ${v.g} g: saved` : `Saved: ${CFG.before} s before, ${CFG.after} s after`);
+  log(`SAVE ${reason}${g ? ' ' + v.g + 'g' : ''} ${hms(v.from)}–${hms(v.to)}`);
+  ui();
+}
+async function relock() {
+  const t = db.transaction('seg', 'readwrite'), os = t.objectStore('seg');
+  for (const s of S.segs) { const l = isLocked(s); if (l !== !!s.locked) { s.locked = l; os.put(s); } }
+  await done(t);
+}
+async function unsave(id) {
+  S.saves = S.saves.filter(v => v.id !== id);
+  await P(store('saves', 'readwrite').delete(id));
+  await relock(); log('save removed ' + hms(id));
+}
+
+// ---------- motion ----------
+const M = { peak: 0, last: 0, minutePeak: 0, ok: false };
+async function askMotion() {
+  if (M.ok || !window.DeviceMotionEvent) return;
+  try {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const r = await DeviceMotionEvent.requestPermission();
+      if (r !== 'granted') { log('motion permission: ' + r); return; }
+    }
+    window.addEventListener('devicemotion', onMotion); M.ok = true; log('motion sensor on');
+  } catch (e) { log('motion permission error: ' + e.message); }
+}
+function onMotion(e) {
+  let g; const a = e.acceleration;
+  if (a && a.x != null) g = Math.hypot(a.x, a.y, a.z) / 9.81;
+  else { const b = e.accelerationIncludingGravity; if (!b || b.x == null) return; g = Math.abs(Math.hypot(b.x, b.y, b.z) / 9.81 - 1); }
+  if (g > M.minutePeak) M.minutePeak = g;
+  if (R.on && g >= CFG.impactG && Date.now() - M.last > 15000) { M.last = Date.now(); save('impact', Date.now(), g); }
+}
+
+// ---------- GPS ----------
+const G = { id: null, fix: null, lastPut: 0 };
+function gpsOn() {
+  if (!navigator.geolocation || G.id !== null) return;
+  G.id = navigator.geolocation.watchPosition(p => {
+    const c = p.coords;
+    G.fix = { t: Date.now(), lat: c.latitude, lon: c.longitude, acc: Math.round(c.accuracy), spd: c.speed, hdg: c.heading };
+    if (G.fix.t - G.lastPut >= 1000) { G.lastPut = G.fix.t; try { store('gps', 'readwrite').put(G.fix); } catch {} }
+  }, e => log('GPS error: ' + e.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+}
+function gpsOff() { if (G.id !== null) navigator.geolocation.clearWatch(G.id); G.id = null; }
+
+// ---------- screen ----------
+let wake = null;
+async function wakeOn() {
+  try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } }
+  catch (e) { log('wake lock refused: ' + e.message); }
+}
+function wakeOff() { if (wake) wake.release().catch(() => {}); wake = null; }
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+function flash() { const f = $('#flash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on'))); }
+
+// ---------- status ----------
+function ui() {
+  document.body.classList.toggle('rec', R.on);
+  $('#state').textContent = R.on ? 'REC' : 'Ready';
+  $('#go').textContent = R.on ? 'Stop' : 'Start';
+  $('#save').disabled = !R.on;
+  const locked = S.segs.filter(s => s.locked).reduce((a, s) => a + s.size, 0);
+  $('#store').textContent = `${mb(used())} of ${CFG.capGB} GB · saved ${mb(locked)}`;
+}
+function tick() {
+  const now = Date.now();
+  $('#clock').textContent = hms(now);
+  $('#elapsed').textContent = R.on ? (() => { const s = Math.floor((now - R.started) / 1000); return `${Math.floor(s / 3600)}:${two(Math.floor(s / 60) % 60)}:${two(s % 60)}`; })() : '';
+  const f = G.fix, age = f ? now - f.t : Infinity;  // a parked phone may go quiet, so the fix stays good for 30 s
+  $('#spd').textContent = age < 5000 && f.spd != null && f.spd >= 0 ? Math.round(f.spd * 3.6) : '–';
+  $('#gps').textContent = age < 30000 ? `GPS ±${f.acc} m` : (R.on ? 'GPS searching' : 'GPS –');
+  if (R.on && R.cur && now - R.cur.t0 >= CFG.segSec * 1000) rotate();
+  if (R.on && !R.cur && document.visibilityState === 'visible') R.cur = startSeg();
+  const tr = R.on && R.stream && R.stream.getVideoTracks()[0];
+  $('#alert').textContent = tr && tr.readyState === 'ended' ? 'Camera stopped' : (tr && tr.muted ? 'Camera paused' : '');
+}
+setInterval(tick, 500);
+setInterval(() => { if (R.on && M.ok) log(`motion peak last minute ${M.minutePeak.toFixed(2)} g`); M.minutePeak = 0; }, 60000);
+
+// ---------- controls ----------
+$('#go').addEventListener('click', () => {
+  if (!R.on) return start();
+  const b = $('#go');                               // two taps to stop, so a stray touch doesn't end the recording
+  if (b.classList.contains('arm')) { b.classList.remove('arm'); clearTimeout(R.armTimer); return stop(); }
+  b.classList.add('arm'); b.textContent = 'Tap again'; R.armTimer = setTimeout(() => { b.classList.remove('arm'); ui(); }, 3000);
+});
+$('#save').addEventListener('click', () => save('button'));
+$('#dimb').addEventListener('click', () => { document.body.classList.toggle('dim'); $('#dimb').textContent = document.body.classList.contains('dim') ? 'Bright' : 'Dim'; });
+$('#menub').addEventListener('click', () => openSheet('clips'));
+document.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'); if (o) openSheet(o.dataset.open);
+  if (e.target.closest('[data-close]')) closeSheet(e.target.closest('.sheet'));
+});
+function openSheet(id) {
+  document.querySelectorAll('.sheet.on').forEach(s => s.classList.remove('on'));
+  $('#' + id).classList.add('on');
+  ({ clips: renderClips, settings: renderSettings, logs: renderLog })[id]?.();
+}
+function closeSheet(sh) {
+  sh.classList.remove('on');
+  if (sh.id === 'playsheet') { const p = $('#player'); p.pause(); revokeAll(); openSheet('clips'); }
+  if (sh.id === 'settings' || sh.id === 'logs') openSheet('clips');
+}
+
+// ---------- clips ----------
+const urls = []; const revokeAll = () => { while (urls.length) URL.revokeObjectURL(urls.pop()); };
+const segsFor = (from, to) => S.segs.filter(s => s.id < to && s.end > from);
+const ready = new Map();                            // key -> File[] prepared for sharing (iOS needs the tap to share directly)
+const stamp = t => { const d = new Date(t); return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; };
+async function filesFor(segs) {
+  return Promise.all(segs.map(async (s, i) => {
+    const b = await P(store('blob').get(s.id));
+    const ext = (s.mime || '').includes('webm') ? 'webm' : 'mp4';
+    return new File([b], `dashcam_${stamp(s.id)}_${two(i + 1)}.${ext}`, { type: s.mime || 'video/mp4' });
+  }));
+}
+function renderClips() {
+  const L = $('#cliplist'); L.innerHTML = '';
+  const add = (key, title, info, segs, extra) => {
+    const d = document.createElement('div'); d.className = 'row';
+    const sz = segs.reduce((a, s) => a + s.size, 0);
+    d.innerHTML = `<div class="t"></div><div class="muted"></div><div class="acts"></div>`;
+    d.querySelector('.t').textContent = title;
+    d.querySelector('.muted').textContent = segs.length ? `${info} · ${segs.length} parts · ${mb(sz)}` : `${info} · no footage`;
+    const acts = d.querySelector('.acts');
+    const btn = (label, fn, cls) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', () => fn(b)); acts.appendChild(b); return b; };
+    if (segs.length) {
+      btn('Play', () => play(title, segs));
+      btn(ready.has(key) ? 'Share now' : 'Share', async b => {
+        if (ready.has(key)) {
+          const files = ready.get(key);
+          try {
+            if (navigator.canShare && navigator.canShare({ files })) await navigator.share({ files, title });
+            else files.forEach(f => { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); });
+            log(`shared ${files.length} files (${title})`);
+          } catch (e) { if (e.name !== 'AbortError') log('share failed: ' + e.message); }
+          return;
+        }
+        b.textContent = 'Preparing…';
+        try { ready.set(key, await filesFor(segs)); b.textContent = 'Share now'; b.className = 'hot'; }
+        catch (e) { b.textContent = 'Share'; log('prepare failed: ' + e.message); }
+      });
+    }
+    if (extra) extra(btn);
+    L.appendChild(d);
+  };
+  const saves = S.saves.slice().sort((a, b) => b.id - a.id);
+  if (!saves.length) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'No saved clips yet. Tap SAVE while recording, or a hard knock saves one automatically.'; L.appendChild(p); }
+  for (const v of saves) {
+    const why = v.reason === 'impact' ? `Impact ${v.g} g` : v.reason === 'button' ? 'Save button' : v.reason;
+    add('save' + v.id, `${ymd(v.id)} ${hms(v.id)}`, why + (Date.now() < v.to ? ' · still recording' : ''), segsFor(v.from, v.to),
+      btn => btn('Delete', async () => { await unsave(v.id); ready.delete('save' + v.id); renderClips(); ui(); }));
+  }
+  const h = document.createElement('h3'); h.textContent = 'Recent footage'; h.style.margin = '18px 0 8px'; L.appendChild(h);
+  for (const min of [2, 10]) add('last' + min, `Last ${min} minutes`, 'not locked, may be pruned', segsFor(Date.now() - min * 60000, Date.now()));
+  const all = S.segs; const p = document.createElement('p'); p.className = 'muted';
+  p.textContent = all.length ? `Stored: ${mb(used())} in ${all.length} parts, from ${ymd(all[0].id)} ${hms(all[0].id)}. Limit ${CFG.capGB} GB. App v${VERSION}.` : `Nothing stored yet. App v${VERSION}.`;
+  L.appendChild(p);
+  if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { p.textContent += ` Browser allows ${mb(e.quota || 0)}.`; }).catch(() => {});
+}
+async function play(title, segs) {
+  openSheet('playsheet'); $('#playtitle').textContent = title;
+  const p = $('#player'); let i = 0;
+  const load = async () => {
+    const b = await P(store('blob').get(segs[i].id)); revokeAll();
+    const u = URL.createObjectURL(b); urls.push(u); p.src = u; p.play().catch(() => {});
+    $('#playinfo').textContent = `Part ${i + 1} of ${segs.length} · ${hms(segs[i].id)}`;
+  };
+  p.onended = () => { if (++i < segs.length) load(); };
+  await load();
+}
+
+// ---------- settings + log ----------
+function renderSettings() {
+  const L = $('#setlist'); L.innerHTML = '';
+  for (const [k, name, unit, help, min, max] of SETTINGS) {
+    const l = document.createElement('label'); l.className = 'set';
+    l.innerHTML = `<span></span><input type="number" inputmode="decimal">`;
+    l.querySelector('span').innerHTML = `${name} (${unit})<small></small>`; l.querySelector('small').textContent = help;
+    const inp = l.querySelector('input'); inp.min = min; inp.max = max; inp.step = k === 'impactG' ? '0.1' : '1'; inp.value = CFG[k];
+    inp.addEventListener('change', () => { const v = Math.min(max, Math.max(min, +inp.value || DEFAULTS[k])); inp.value = v; CFG[k] = v; saveCfg(); log(`setting ${k} = ${v}`); ui(); });
+    L.appendChild(l);
+  }
+  const n = document.createElement('p'); n.className = 'muted';
+  n.textContent = 'Resolution, frame rate and bitrate apply the next time you tap Start. Keep Auto-Lock on Never so the screen stays on.';
+  L.appendChild(n);
+}
+function renderLog() { $('#logtxt').textContent = S.log.slice(-400).reverse().join('\n'); }
+$('#sharelog').addEventListener('click', async () => {
+  const f = new File([S.log.join('\n')], `dashcam_log_${stamp(Date.now())}.txt`, { type: 'text/plain' });
+  try { if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f] }); else { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); } }
+  catch (e) { if (e.name !== 'AbortError') log('log share failed: ' + e.message); }
+});
+
+// ---------- boot ----------
+(async () => {
+  try {
+    db = await openDb();
+    S.segs = (await P(store('seg').getAll())).sort((a, b) => a.id - b.id);
+    S.saves = await P(store('saves').getAll());
+    const keys = await P(store('log').getAllKeys());
+    if (keys.length > 5000) { const t = db.transaction('log', 'readwrite'); keys.slice(0, keys.length - 4000).forEach(k => t.objectStore('log').delete(k)); await done(t); }
+    S.log = (await P(store('log').getAll())).slice(-1000);
+    if (S.segs.length) await P(store('gps', 'readwrite').delete(IDBKeyRange.upperBound(S.segs[0].id - 3600e3)));
+  } catch (e) { toast('Storage unavailable: ' + e.message); }
+  log(`app opened v${VERSION}, ${S.segs.length} segments, ${S.saves.length} saves${navigator.standalone ? ', home screen app' : ''}`);
+  ui(); tick();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => log('service worker: ' + e.message));
+})();
+</script>
+</body>
+</html>
