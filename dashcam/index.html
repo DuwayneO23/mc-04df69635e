@@ -121,7 +121,7 @@ pre#logtxt { margin: 0; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace
 'use strict';
 // Dash Cam: records the back camera in short MP4 segments into IndexedDB, keeps a rolling window of footage,
 // and locks segments around a save (button or impact) so they are never pruned. Upload to TARS comes later.
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const $ = s => document.querySelector(s);
 
 // ---------- settings ----------
@@ -415,12 +415,18 @@ const urls = []; const revokeAll = () => { while (urls.length) URL.revokeObjectU
 const segsFor = (from, to) => S.segs.filter(s => s.id < to && s.end > from);
 const ready = new Map();                            // key -> File[] prepared for sharing (iOS needs the tap to share directly)
 const stamp = t => { const d = new Date(t); return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; };
+const hm = t => hms(t).slice(0, 5);
+// File names carry the segment's start to the millisecond (phone local time); the PC side cuts clips from them.
 async function filesFor(segs) {
-  return Promise.all(segs.map(async (s, i) => {
+  const files = await Promise.all(segs.map(async s => {
     const b = await P(store('blob').get(s.id));
     const ext = (s.mime || '').includes('webm') ? 'webm' : 'mp4';
-    return new File([b], `dashcam_${stamp(s.id)}_${two(i + 1)}.${ext}`, { type: s.mime || 'video/mp4' });
+    return new File([b], `dashcam_${stamp(s.id)}-${String(s.id % 1000).padStart(3, '0')}.${ext}`, { type: s.mime || 'video/mp4' });
   }));
+  const from = segs[0].id, to = segs[segs.length - 1].end;
+  const pts = await P(store('gps').getAll(IDBKeyRange.bound(from - 5000, to + 5000)));
+  if (pts.length) files.push(new File([JSON.stringify({ from, to, points: pts })], `dashcam_gps_${stamp(from)}.json`, { type: 'application/json' }));
+  return files;
 }
 function renderClips() {
   const L = $('#cliplist'); L.innerHTML = '';
@@ -459,8 +465,20 @@ function renderClips() {
     add('save' + v.id, `${ymd(v.id)} ${hms(v.id)}`, why + (Date.now() < v.to ? ' · still recording' : ''), segsFor(v.from, v.to),
       btn => btn('Delete', async () => { await unsave(v.id); ready.delete('save' + v.id); renderClips(); ui(); }));
   }
-  const h = document.createElement('h3'); h.textContent = 'Recent footage'; h.style.margin = '18px 0 8px'; L.appendChild(h);
-  for (const min of [2, 10]) add('last' + min, `Last ${min} minutes`, 'not locked, may be pruned', segsFor(Date.now() - min * 60000, Date.now()));
+  // All footage, newest drive first, in 5-minute blocks so the bit around a TARS mark can be sent on its own.
+  const drives = [];
+  for (const s of S.segs) {
+    const d = drives[drives.length - 1];
+    if (d && s.id - d.end < 120000) { d.segs.push(s); d.end = Math.max(d.end, s.end); } else drives.push({ start: s.id, end: s.end, segs: [s] });
+  }
+  for (const d of drives.reverse()) {
+    const h = document.createElement('h3'); h.style.margin = '18px 0 8px';
+    h.textContent = `Drive ${ymd(d.start)} ${hm(d.start)}–${hm(d.end)} (${Math.max(1, Math.round((d.end - d.start) / 60000))} min)`;
+    L.appendChild(h);
+    const blocks = new Map();
+    for (const s of d.segs) { const b = Math.floor(s.id / 300000) * 300000; if (!blocks.has(b)) blocks.set(b, []); blocks.get(b).push(s); }
+    for (const [b, segs] of [...blocks].reverse()) add('blk' + b, `${hm(b)}–${hm(b + 300000)}`, segs.some(s => s.locked) ? 'has saved parts' : 'footage', segs);
+  }
   const all = S.segs; const p = document.createElement('p'); p.className = 'muted';
   p.textContent = all.length ? `Stored: ${mb(used())} in ${all.length} parts, from ${ymd(all[0].id)} ${hms(all[0].id)}. Limit ${CFG.capGB} GB. App v${VERSION}.` : `Nothing stored yet. App v${VERSION}.`;
   L.appendChild(p);
