@@ -1,6 +1,6 @@
 // Offline cache: the car screen has to open with no signal (clock, places, music links all work without the PC).
 // Bump V on every release. Only this app's own files are cached; the PC link and the weather are never touched.
-const V = 'tars-drive-v1.6.0';
+const V = 'tars-drive-v1.6.1';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './tars-check.mp3', './silence.mp3'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('tars-drive-') && k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

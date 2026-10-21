@@ -574,7 +574,7 @@ html[data-theme="night"] #toast { background: rgba(6,10,20,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.6.0';
+const VERSION = '1.6.1';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -1139,7 +1139,8 @@ async function camStart(fromTap) {
     if (motion) await motion;
     CAM.mime = camMime();
     if (CAM.mime === null) { CAM.err = 'This phone can’t record video here'; camLog('no MediaRecorder'); stream.getTracks().forEach(t => t.stop()); return; }
-    if (!camCfg.on || document.visibilityState !== 'visible') { stream.getTracks().forEach(t => t.stop()); return; }   // switched off or left meanwhile
+    // switched off, left the app or went to Home mode while the camera was starting: never record then
+    if (!camCfg.on || document.visibilityState !== 'visible' || appMode() !== 'drive') { stream.getTracks().forEach(t => t.stop()); return; }
     if (CAM.stream && CAM.stream !== stream) CAM.stream.getTracks().forEach(t => t.stop());
     if (CAM.aimStream) { CAM.aimStream.getTracks().forEach(t => t.stop()); CAM.aimStream = null; }
     CAM.stream = stream; camWatchTrack(); camAimAttach();
@@ -1160,6 +1161,13 @@ function camStop(why) {
   setTimeout(() => { if (!CAM.on && s && CAM.stream === s) { s.getTracks().forEach(t => t.stop()); CAM.stream = null; camAimAttach(); camUi(); } }, 1500);
   camLog(`STOP (${why}) after ${Math.round((Date.now() - CAM.started) / 60000)} min`);
   camUi(); camSyncSoon();
+}
+// At launch, with a Home spot saved, wait for the first GPS fix to say whether this is home (where the dash cam stays
+// off) before opening the camera; after 8 s without a fix, start anyway.
+function camStartWhenSure(t0 = performance.now()) {
+  if (!camCfg.on || appMode() !== 'drive' || document.visibilityState !== 'visible') return;
+  if (MODE.first && homeSpot() && cfg.autoHome !== false && performance.now() - t0 < 8000) { setTimeout(() => camStartWhenSure(t0), 400); return; }
+  camStart(false);
 }
 function camTurnOn() { camCfg.on = true; saveCamCfg(); store.set('camOffered', 9); camStart(true); }
 function camTurnOff() { camCfg.on = false; saveCamCfg(); camStop('turned off'); }
@@ -1781,7 +1789,7 @@ function camBoot() {
   camReady.then(() => {
     if (CAM.db) camLog(`app opened v${VERSION}, ${CAM.segs.length} segments, ${CAM.saves.length} saves${standalone() ? ', home screen app' : ''}`);
     camUi();
-    if (camCfg.on && document.visibilityState === 'visible') camStart(false);
+    if (camCfg.on && document.visibilityState === 'visible') camStartWhenSure();
     camSyncLoop();
   });
   setInterval(() => { if (CAM.on && MO.ok) camLog(`motion peak last minute ${MO.peak.toFixed(2)} g`); MO.peak = 0; }, 60000);
