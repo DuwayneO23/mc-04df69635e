@@ -94,6 +94,7 @@ html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
 
 .readout { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 8px; justify-content: center; align-self: stretch; min-height: 0; overflow: hidden; }
 .readout > * { flex-shrink: 0; }
+.readout > .reply { flex-shrink: 1; }
 .readout.tight { justify-content: flex-start; gap: 5px; }
 .readout.tight .said { -webkit-line-clamp: 1; max-height: 1.3em; }
 .status { color: var(--dim); display: flex; align-items: center; gap: 8px; }
@@ -105,12 +106,15 @@ html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
 @keyframes blink { 50% { opacity: .2; } }
 .said { color: var(--dim); font-size: 15px; line-height: 1.3; max-height: 2.6em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .said:empty { display: none; }
-.reply { font: 500 clamp(19px, 5.4vw, 24px)/1.28 var(--display); letter-spacing: -.01em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.reply { font: 500 clamp(19px, 5.4vw, 24px)/1.28 var(--display); letter-spacing: -.01em; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.reply::-webkit-scrollbar { display: none; }
+.reply.scrolls { -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); }
+.reply .w { transition: opacity .2s ease, color .45s ease; }
+.reply .w.up { opacity: .1; }
+.reply .w.cur { color: var(--amber); }
 .reply.hint { color: var(--dim); font-weight: 400; }
 .reply.err { color: var(--bad); }
-.reply span { transition: opacity .35s, color .35s; }
-.reply span.pending { opacity: .45; }
-.reply span.now { color: var(--ink); }
 .action { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 20px; background: var(--bg2); border: 1px solid var(--line2);
   animation: rise .35s cubic-bezier(.2,.8,.3,1); cursor: default; }
 @keyframes rise { from { transform: translateY(8px); opacity: 0; } }
@@ -194,7 +198,7 @@ html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
   .sub { font-size: 13px; }
   .tars { grid-column: 2; grid-row: 2; min-height: 0; padding: 12px 12px 12px 14px; column-gap: 14px; }
   .monolith, .tars.has-action .monolith { height: clamp(76px, 24vh, 120px); }
-  .reply { -webkit-line-clamp: 3; font-size: 18px; }
+  .reply { font-size: 18px; }
   .said { font-size: 13px; }
   .action { padding: 6px 6px 6px 12px; }
   .action .go, .action .alt, .action .x { height: 44px; }
@@ -427,7 +431,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -812,22 +816,14 @@ function setState(st, status) {
 }
 function setReply(html, cls = '') { const r = $('#reply'); r.className = 'reply ' + cls; r.innerHTML = html; fitReply(); }
 function fitReply() {
-  // TARS's words must fit the card, in this order: shrink them (down to 15px), keep the heard line to one
-  // line, drop the heard line, then show as many whole lines of the reply as fit (the clamp ends with "…").
+  // The reply scrolls inside the card (TARS's words follow the voice), so fitting only has to keep at least
+  // two lines of it in view: the heard line goes to one line, then away, when the card is short.
   const r = $('#reply'), box = r.parentElement, said = $('#said');
-  r.style.fontSize = ''; r.style.webkitLineClamp = ''; said.style.display = ''; box.classList.remove('tight');
-  const over = () => box.scrollHeight > box.clientHeight + 1;
-  let size = parseFloat(getComputedStyle(r).fontSize) || 22;
-  while (over() && size > 15) { size = Math.max(15, size - 1); r.style.fontSize = size + 'px'; }
-  if (over()) box.classList.add('tight');
-  if (over() && said.textContent) said.style.display = 'none';
-  if (over()) {
-    const gap = parseFloat(getComputedStyle(box).rowGap) || 0;
-    const kids = [...box.children].filter(el => el !== r && getComputedStyle(el).display !== 'none');
-    const used = kids.reduce((a, el) => a + el.getBoundingClientRect().height, 0) + gap * kids.length;
-    const lh = parseFloat(getComputedStyle(r).lineHeight) || size * 1.28;
-    r.style.webkitLineClamp = String(Math.max(1, Math.floor((box.clientHeight - used) / lh)));
-  }
+  said.style.display = ''; box.classList.remove('tight');
+  const lh = parseFloat(getComputedStyle(r).lineHeight) || 28, short = () => r.scrollHeight > r.clientHeight + 1 && r.clientHeight < lh * 2 - 1;
+  if (short()) box.classList.add('tight');
+  if (short() && said.textContent) said.style.display = 'none';
+  r.classList.toggle('scrolls', r.scrollHeight > r.clientHeight + 1);
 }
 function fitLayout() {
   // The phone's own bars (notch, home bar) take height the design didn't count on. Step down in three
@@ -860,7 +856,7 @@ function speakLocal(text) {                        // only for "can't reach the 
 function onTarsTap(e) {
   if (e && e.target.closest('.action')) return;
   wakeOn();
-  if (T.st === 'speaking') { stopVoice(); setState('idle'); markAll('spoken'); return; }
+  if (T.st === 'speaking') { stopVoice(); setState('idle'); markAll(); return; }
   if (T.st === 'listening') { endListening('tap'); return; }
   if (T.st === 'thinking' || T.st === 'sending') { cancelTurn(); return; }
   if (T.st === 'arming') return;
@@ -1029,39 +1025,65 @@ function onEvent(ev, turn) {
     case 'done': turn.ms = ev.ms; break;
   }
 }
+// TARS's words appear as he says them: each sentence is a row of word spans, dim ("up") until the voice
+// reaches them. The PC sends Kokoro's timing for every word with the voice; without it (or with voice
+// replies off) the words are spread over the sentence's length, or simply shown.
+function textWords(text) { const out = []; String(text).replace(/(\S+)(\s*)/g, (_, w, ws) => { out.push([null, null, w, ws]); return ''; }); return out; }
+function fillWords(sent, words, cls) {
+  sent.textContent = '';
+  return words.map(([st, en, w, ws]) => {
+    const el = document.createElement('span'); el.className = 'w ' + cls; el.textContent = w; sent.appendChild(el);
+    if (ws) sent.appendChild(document.createTextNode(ws));
+    return { el, s: st, e: en };
+  });
+}
+function spreadWords(text, dur) {
+  const ws = textWords(text), total = ws.reduce((a, w) => a + w[2].length + 1, 0) || 1;
+  let t = Math.min(.25, dur * .05); const span = Math.max(.1, dur - t - .2);
+  for (const w of ws) { const d = span * (w[2].length + 1) / total; w[0] = t; w[1] = t + d; t += d; }
+  return ws;
+}
 function addSentence(ev, turn) {
   const r = $('#reply');
-  if (!turn.reply.length) { r.className = 'reply'; r.innerHTML = ''; }
+  if (!turn.reply.length) { r.className = 'reply'; r.innerHTML = ''; r.scrollTop = 0; }
   turn.reply.push(ev.text);
-  const s = document.createElement('span');
-  s.dataset.id = ev.id; s.className = cfg.voice ? 'pending' : '';
-  s.textContent = (turn.reply.length > 1 ? ' ' : '') + ev.text;
-  r.appendChild(s);
+  if (turn.reply.length > 1) r.appendChild(document.createTextNode(' '));
+  const sent = document.createElement('span');
+  sent.className = 'sent'; sent.dataset.id = ev.id;
+  fillWords(sent, textWords(ev.text), cfg.voice ? 'up' : 'on');
+  r.appendChild(sent);
   fitReply();
   if (T.st !== 'speaking') setState('thinking', cfg.voice ? 'Speaking' : 'TARS');
 }
-function mark(id, cls) { const s = document.querySelector(`#reply span[data-id="${id}"]`); if (s) s.className = cls === 'spoken' ? '' : cls; }
-function markAll(cls) { document.querySelectorAll('#reply span').forEach(s => { s.className = cls === 'spoken' ? '' : cls; }); }
+function reveal(list, from = 0) { for (let i = from; i < list.length; i++) { list[i].el.classList.remove('up', 'cur'); list[i].el.classList.add('on'); } }
+function markAll() { document.querySelectorAll('#reply .w.up, #reply .w.cur').forEach(el => { el.classList.remove('up', 'cur'); el.classList.add('on'); }); }
+function follow(el) {
+  // keep the word TARS is saying in view, a third of the way down the box
+  const box = $('#reply'), b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
+  if (r.bottom > b.bottom - 6 || r.top < b.top) box.scrollTo({ top: box.scrollTop + (r.top - b.top) - b.height * .3, behavior: 'smooth' });
+}
 function enqueueVoice(ev) {
   if (!cfg.voice || !ev.audio) return;
   try {
     const bin = atob(ev.audio), u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    V.q.push({ id: ev.id, url: URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' })), env: ev.env || [], dur: ev.dur || 0 });
+    const sent = document.querySelector(`#reply .sent[data-id="${ev.id}"]`);
+    const words = sent ? fillWords(sent, ev.words && ev.words.length ? ev.words : spreadWords(sent.textContent, ev.dur || 1), 'up') : null;
+    V.q.push({ id: ev.id, url: URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' })), env: ev.env || [], dur: ev.dur || 0, words, k: 0, last: null });
   } catch (e) { log('voice decode: ' + e.message); return; }
   if (!V.cur) playNext();
 }
 function playNext() {
   const item = V.q.shift();
   if (!item) { V.cur = null; settle(); return; }
-  V.cur = item; mark(item.id, 'now');
+  V.cur = item;
   setState('speaking');
   voiceEl.src = item.url;
   const p = voiceEl.play();
   if (p) p.catch(err => {
     log('voice blocked: ' + err.name);
     if (err.name === 'NotAllowedError') {                // iOS wants a tap first: keep the reply and ask for one
-      V.q.unshift(item); V.cur = null; markAll('');
+      V.q.unshift(item); V.cur = null; markAll();
       setState('idle', 'Tap to hear TARS');
       showAction({ title: 'Tap to hear TARS', sub: 'iOS wants a tap before it plays sound', button: 'PLAY', run: () => { musicDuck(); playNext(); } });
       return;
@@ -1071,24 +1093,26 @@ function playNext() {
 }
 function voiceDone() {
   if (!V.cur) return;
-  mark(V.cur.id, 'spoken'); URL.revokeObjectURL(V.cur.url); V.cur = null; playNext();
+  if (V.cur.words) reveal(V.cur.words);
+  URL.revokeObjectURL(V.cur.url); V.cur = null; playNext();
 }
 voiceEl.addEventListener('ended', voiceDone);
 voiceEl.addEventListener('error', () => { if (V.cur) { log('voice error'); voiceDone(); } });
 function stopVoice() {
+  markAll();
   V.q.forEach(x => URL.revokeObjectURL(x.url)); V.q = [];
   if (V.cur) { try { voiceEl.pause(); } catch {} URL.revokeObjectURL(V.cur.url); V.cur = null; }
 }
 function settle() {                                  // after the last voice, or the stream ended with nothing to play
   if (T.abort || V.cur || V.q.length || T.st === 'listening' || T.st === 'arming') return;
   if (T.st === 'error') return;
-  markAll('spoken'); setState('idle');
+  markAll(); setState('idle');
 }
 function finishTurn(turn) {
   if (!turn.reply.length && !turn.error && !turn.actions.length) { turn.error = 'TARS had nothing to say.'; showError(turn.error, false); }
   convos.unshift({ at: turn.at, kind: turn.kind, heard: turn.heard, reply: turn.reply.join(' '), actions: turn.actions, error: turn.error, ms: turn.ms, mode: turn.mode });
   convos = convos.slice(0, 60); store.set('history', convos);
-  if (!cfg.voice || !V.cur && !V.q.length) { if (T.st !== 'error') { markAll('spoken'); setState('idle'); } }
+  if (!cfg.voice || !V.cur && !V.q.length) { markAll(); if (T.st !== 'error') setState('idle'); }
 }
 function showError(msg, offline) {
   stopVoice(); setState('error');
@@ -1151,6 +1175,16 @@ function animate(t) {
   if (document.hidden || (T.st === 'idle' && ++frame % 3)) return;   // idle breathing doesn't need 60 fps
   let env = 0;
   if (T.st === 'speaking' && V.cur && V.cur.env.length) env = V.cur.env[Math.min(V.cur.env.length - 1, Math.floor((voiceEl.currentTime || 0) * 20))] || 0;
+  if (T.st === 'speaking' && V.cur && V.cur.words) {
+    const W = V.cur.words, ct = (voiceEl.currentTime || 0) + .05;
+    let moved = false;
+    while (V.cur.k < W.length && (W[V.cur.k].s == null || W[V.cur.k].s <= ct)) {
+      const w = W[V.cur.k++];
+      if (V.cur.last) V.cur.last.classList.remove('cur');
+      w.el.classList.remove('up'); w.el.classList.add('on', 'cur'); V.cur.last = w.el; moved = true;
+    }
+    if (moved) follow(V.cur.last);
+  }
   for (let i = 0; i < 4; i++) {
     let target;
     if (T.st === 'listening' || T.st === 'arming') target = 0.08 + T.level * (0.78 + 0.22 * Math.sin(t / 95 + i * 1.7));
@@ -1617,7 +1651,7 @@ function demo(kind) {
   else if (kind === 'thinking') { setState('thinking', 'Thinking'); setReply('…', 'hint'); }
   else if (kind === 'error') { showError("Can't reach the PC. Is Tailscale on, with signal?", true); }
   else {
-    setReply('<span class="">Twenty-two minutes, boss.</span><span class="pending"> Traffic’s light on the highway, so you’ll beat the rain.</span>');
+    setReply('<span class="sent"><span class="w on">Twenty-two</span> <span class="w on">minutes,</span> <span class="w on cur">boss.</span></span> <span class="sent"><span class="w up">Traffic’s</span> <span class="w up">light</span> <span class="w up">on</span> <span class="w up">the</span> <span class="w up">highway,</span> <span class="w up">so</span> <span class="w up">you’ll</span> <span class="w up">beat</span> <span class="w up">the</span> <span class="w up">rain.</span></span>');
     if (kind === 'speaking' || kind === 'night') { setState('speaking'); V.cur = { id: 0, env: Array.from({ length: 400 }, (_, i) => 0.3 + 0.6 * Math.abs(Math.sin(i / 2.3))), url: '' }; Object.defineProperty(voiceEl, 'currentTime', { get: () => (Date.now() / 1000) % 19 }); }
     else setState('idle');
     if (kind === 'go') showGo('Home');
