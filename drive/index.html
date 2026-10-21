@@ -283,6 +283,46 @@ html.fx.boot .group { animation-delay: .26s; } html.fx.boot .group + .group { an
   html.fx.boot .top, html.fx.boot .hero, html.fx.boot .tars, html.fx.boot .quick, html.fx.boot .group, html.fx.boot .bottom { animation: none !important; }
 }
 
+/* ---------- dash cam: the REC light, Save clip, the save flash, the Dash cam sheet ---------- */
+.camchip { gap: 7px; padding: 0 10px; font: 700 11.5px/1 var(--mono); letter-spacing: .1em; }
+.camchip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.camchip.rec .dot { background: #ff453a; box-shadow: 0 0 8px rgba(255,69,58,.75); animation: recdot 1.8s ease-in-out infinite; }
+.camchip.paused .dot, .camchip.starting .dot { background: var(--amber); }
+.camchip.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.camchip.bad .dot { background: var(--bad); }
+.camchip .el { color: var(--dim); font-weight: 600; }
+@keyframes recdot { 50% { opacity: .3; } }
+@media (max-width: 389px) { .camchip .el { display: none; } }
+@media (orientation: portrait) {   /* setup chip + REC light + weather leave no room for the date: hide it rather than show "WE…" */
+  .top:has(.setupbar:not([hidden])):has(.camchip:not([hidden])) .date { visibility: hidden; } }
+.quick button.camsave { display: inline-flex; align-items: center; gap: 8px; border-color: color-mix(in srgb, #ff453a 42%, transparent); }
+.quick button.camsave i { width: 9px; height: 9px; border-radius: 50%; background: #ff453a; box-shadow: 0 0 8px rgba(255,69,58,.6); }
+#camflash { position: fixed; inset: 0; z-index: 45; pointer-events: none; opacity: 0; transition: opacity .9s ease-out;
+  box-shadow: inset 0 0 0 6px var(--amber), inset 0 0 70px color-mix(in srgb, var(--amber) 45%, transparent); }
+#camflash.on { opacity: 1; transition: none; }
+html.camrec .orb { animation-play-state: paused; }   /* the camera works the phone hard enough: the sky holds still while it records */
+.aim { position: relative; margin-top: 10px; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; }
+.aim video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.aim i { position: absolute; left: 6%; right: 6%; top: 40%; border-top: 1.5px dashed rgba(255,255,255,.7); }
+.aim i::after { content: "horizon"; position: absolute; right: 0; top: 3px; font: 600 10px var(--mono); letter-spacing: .1em; color: rgba(255,255,255,.75); text-transform: uppercase; }
+.camplayer { width: 100%; max-height: 52vh; border-radius: 12px; background: #000; margin-top: 8px; display: block; }
+.camrow { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.camrow:last-child { border-bottom: 0; }
+.camrow .t { font-weight: 650; }
+.camrow .s { color: var(--dim); font-size: 13px; margin-top: 2px; }
+.camrow .acts { margin-top: 8px; }
+.camdrive { color: var(--faint); margin: 16px 0 0; }
+.camset { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.camset .u { color: var(--dim); font-size: 13px; }
+.camset small { display: block; color: var(--dim); font-size: 12.5px; }
+.camset .field { width: 96px; flex: none; margin: 0; text-align: right; }
+.camdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 9px; background: var(--faint); vertical-align: 1px; }
+.camdot.rec { background: #ff453a; box-shadow: 0 0 10px rgba(255,69,58,.7); }
+.camdot.paused, .camdot.starting { background: var(--amber); }
+.camdot.bad { background: var(--bad); }
+pre.camlog { margin: 8px 0 0; font: 11.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--dim); max-height: 280px; overflow: auto; }
+@media (prefers-reduced-motion: reduce) { .camchip.rec .dot { animation: none; } }
+
 /* ---------- sheets ---------- */
 .sheet { position: fixed; inset: 0; z-index: 10; background: var(--bg); display: flex; flex-direction: column; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); visibility: hidden; }
 .sheet.on { transform: none; visibility: visible; }
@@ -374,6 +414,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
   <div class="top">
     <div class="date mono" id="date"></div>
     <button class="setupbar" id="setupbar" hidden></button>
+    <button class="chip camchip" id="camchip" hidden aria-label="Dash cam"></button>
     <button class="chip" id="wx" hidden></button>
     <button id="linkdot" aria-label="TARS link"></button>
   </div>
@@ -424,6 +465,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 </section>
 <div id="modal" hidden><div class="box"><h3 id="mtitle"></h3><p id="mtext"></p><div class="acts" id="macts"></div></div></div>
 <div id="toast"></div>
+<div id="camflash" aria-hidden="true"></div>
 <audio id="voice" preload="auto"></audio>
 
 <script>
@@ -431,7 +473,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.3.1';
+const VERSION = '1.4.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -533,6 +575,7 @@ function tick() {
     renderSub(); applyTheme();
   }
   renderSpeed();
+  camOfferTick();
 }
 function dur(ms) { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${two(m % 60)}`; }
 function renderSub() {
@@ -563,6 +606,7 @@ function dist(a, b) {
 function onFix(p) {
   const c = p.coords, f = { t: Date.now(), lat: c.latitude, lon: c.longitude, acc: c.accuracy, spd: c.speed != null && c.speed >= 0 ? c.speed : null };
   G.denied = false;
+  camGps(c);
   if (f.spd == null && G.fix && f.acc < 30 && G.fix.acc < 30 && f.t > G.fix.t) f.spd = dist(G.fix, f) / ((f.t - G.fix.t) / 1000);
   if (G.trip && G.fix && f.acc < 35 && G.fix.acc < 35) { const d = dist(G.fix, f); if (d < 400) G.trip.m += d; }
   G.prev = G.fix; G.fix = f;
@@ -800,19 +844,858 @@ $('#np').addEventListener('click', async e => {
   if (j && j.ok === false) toast(j.error);
 });
 
+// ---------- dash cam (the Dash Cam app's recorder, inside TARS Drive) ----------
+// iOS lets only the app on screen use the camera, so the dash cam lives here instead of in its own app. It records the
+// back camera with no sound (the microphone stays TARS's) in short MP4 segments into this app's IndexedDB, keeps a
+// rolling window, and locks the stretch around a save: Save clip, "save that" to TARS (the PC answers it without a brain
+// turn), a knock in the mount, or a mark TARS makes from Telegram. Saved stretches upload to the PC's dash cam server
+// (Yard-Cam/dashcam/tars/server.py: the same host as the car link, at / instead of /car), which cuts the clip for TARS.
+// Recorder, segments and uploads are the Dash Cam app's, proven on this iPhone on 21 Oct.
+const CAM_DEFAULTS = { on: false, segSec: 10, before: 20, voiceBefore: 30, after: 15, capGB: 8, impact: true, impactG: 2.5, kbps: 2500, height: 720, fps: 30 };
+const camCfg = Object.assign({}, CAM_DEFAULTS, store.get('cam', {}));
+const saveCamCfg = () => store.set('cam', camCfg);
+const CAM = { db: null, dbErr: '', on: false, starting: false, stream: null, cur: null, wait: null, mime: '', started: 0, lastEnd: 0,
+  seq: false, empty: 0, ab: false, fails: [], writing: 0, segs: [], saves: [], log: [], quota: Infinity, persisted: null, err: '',
+  hiddenAt: 0, reopening: false, reopenAt: 0, mutedAt: 0, gpsAt: 0, aim: false, aimStream: null, urls: [], ready: new Map(),
+  demo: false, quickShown: null, sideToast: false, wasRec: false, waitLogged: new Set(), micBusy: false, offered: false, statAt: 0 };
+const CP = { ok: false, off: 0, seen: 0, err: '', rtt: 0, busy: false, cur: '', timer: 0, polling: false, skipped: new Set() };
+const MO = { ok: false, denied: false, peak: 0, grav: null, hist: [], pending: null, lastSave: 0, sideways: 0 };
+let camReady = null;
+
+// storage
+const idb = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+const idbDone = t => new Promise((ok, no) => { t.oncomplete = () => ok(); t.onerror = t.onabort = () => no(t.error); });
+const camOS = (name, mode = 'readonly') => CAM.db.transaction(name, mode).objectStore(name);
+function camOpenDb() {
+  return new Promise((ok, no) => {
+    const q = indexedDB.open('drivecam', 1);
+    q.onupgradeneeded = () => {
+      const d = q.result;
+      d.createObjectStore('seg', { keyPath: 'id' });      // segment metadata, id = start time (ms)
+      d.createObjectStore('blob');                         // segment video, same key
+      d.createObjectStore('gps', { keyPath: 't' });
+      d.createObjectStore('saves', { keyPath: 'id' });     // {id, from, to, reason, rid, note, g, reg, acked, sent, done}
+      d.createObjectStore('log', { autoIncrement: true });
+    };
+    q.onsuccess = () => ok(q.result); q.onerror = () => no(q.error);
+  });
+}
+const camUsed = () => CAM.segs.reduce((a, s) => a + s.size, 0);
+const camCap = () => Math.min(camCfg.capGB * 1e9, CAM.quota * 0.8);
+const camLocked = s => CAM.saves.some(v => s.id < v.to && s.end > v.from);
+const camSegsFor = (from, to) => CAM.segs.filter(s => s.id < to && s.end > from);
+const hms = t => { const d = new Date(t); return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`; };
+const ymd = t => { const d = new Date(t); return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`; };
+const mb = b => b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : (b / 1e6).toFixed(1) + ' MB';
+const sleep = ms => new Promise(ok => setTimeout(ok, ms));
+function camDay(t) {
+  const d = new Date(t), n = new Date(), days = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+  return days === 0 ? 'Today' : days === 1 ? 'Yesterday' : `${DAYS[d.getDay()].slice(0, 1)}${DAYS[d.getDay()].slice(1).toLowerCase()} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 1)}${MONTHS[d.getMonth()].slice(1).toLowerCase()}`;
+}
+function camLog(msg) {
+  const line = `${ymd(Date.now())} ${hms(Date.now())} ${msg}`;
+  CAM.log.push(line); if (CAM.log.length > 1500) CAM.log.splice(0, 500);
+  try { if (CAM.db) camOS('log', 'readwrite').add(line); } catch {}
+}
+async function camQuota() {
+  try { const e = await navigator.storage.estimate(); if (e.quota) CAM.quota = e.quota; } catch {}
+  try { if (navigator.storage && navigator.storage.persisted) CAM.persisted = await navigator.storage.persisted(); } catch {}
+}
+async function camBlob(s) {
+  const v = await idb(camOS('blob').get(s.id));
+  return !v ? null : v instanceof Blob ? v : new Blob([v], { type: s.mime || 'video/mp4' });
+}
+
+// recorder. Normally the next segment starts before the current one stops, so the files overlap a little and nothing is
+// lost; if the phone won't run two recorders at once, CAM.seq records one at a time (a short gap at each change).
+function camMime() {
+  if (!window.MediaRecorder) return null;
+  for (const m of ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'])
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch {}
+  return '';
+}
+function camTrack() { const t = CAM.stream && CAM.stream.getVideoTracks()[0]; return t && t.readyState === 'live' ? t : null; }
+function camGetStream() {
+  const h = +camCfg.height, w = Math.round(h * 16 / 9);
+  return navigator.mediaDevices.getUserMedia({ audio: false,
+    video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: +camCfg.fps, max: +camCfg.fps } } });
+}
+function camSegStart() {
+  if (!camTrack()) return null;
+  const opts = { videoBitsPerSecond: camCfg.kbps * 1000 }; if (CAM.mime) opts.mimeType = CAM.mime;
+  let r;
+  try { r = new MediaRecorder(CAM.stream, opts); } catch (e) { camFailed('create', e); return null; }
+  const seg = { r, t0: Date.now(), t1: 0, parts: [], failed: false };
+  r.ondataavailable = e => { if (e.data && e.data.size) seg.parts.push(e.data); };
+  r.onstop = () => camSegDone(seg);
+  r.onerror = e => { seg.failed = true; camLog('recorder error: ' + ((e.error && e.error.name) || e.name || e)); };
+  try { r.start(); } catch (e) { camFailed('start', e); return null; }
+  return seg;
+}
+function camFailed(what, e) {
+  camLog(`recorder ${what} failed: ${e.name} ${e.message}`);
+  const now = Date.now(); CAM.fails = CAM.fails.filter(t => now - t < 30000); CAM.fails.push(now);
+  if (CAM.fails.length >= 5 && CAM.on) { CAM.err = 'The recorder kept failing'; camStop('the recorder kept failing'); }
+}
+function camSegEnd(seg) {
+  if (!seg || seg.r.state === 'inactive') return;
+  seg.t1 = Date.now();
+  try { seg.r.stop(); } catch (e) { camLog('recorder stop failed: ' + e.message); }
+}
+function camRotate() {
+  const old = CAM.cur;
+  if (!CAM.seq) {
+    const next = camSegStart();
+    if (next) { CAM.cur = next; camSegEnd(old); return; }
+    CAM.seq = true; camLog('second recorder would not start: recording one segment at a time');
+  }
+  CAM.cur = null; CAM.wait = old;                   // the next one starts when this one has finished stopping
+  old.r.addEventListener('stop', () => {
+    if (CAM.wait === old) CAM.wait = null;
+    if (CAM.on && !CAM.cur && !CAM.wait && document.visibilityState === 'visible') CAM.cur = camSegStart();
+  }, { once: true });
+  camSegEnd(old);
+}
+async function camSegDone(seg) {
+  const blob = new Blob(seg.parts, { type: seg.r.mimeType || CAM.mime || 'video/mp4' });
+  if (!blob.size) {
+    camLog('empty segment dropped' + (seg.failed ? ' after a recorder error' : ''));
+    if (++CAM.empty >= 2 && !CAM.seq) { CAM.seq = true; camLog('repeated empty segments: recording one segment at a time'); }
+    return;
+  }
+  CAM.empty = 0;
+  const meta = { id: seg.t0, end: seg.t1 || Date.now(), size: blob.size, mime: blob.type };
+  meta.locked = camLocked(meta);
+  const gap = CAM.lastEnd ? seg.t0 - CAM.lastEnd : 0;
+  CAM.lastEnd = Math.max(CAM.lastEnd, meta.end);
+  CAM.writing++;
+  const ok = await camWrite(meta, blob);
+  if (ok) { CAM.segs.push(meta); CAM.segs.sort((a, b) => a.id - b.id); }
+  CAM.writing--;
+  if (!ok) return;
+  if (gap > 400) camLog(`gap of ${(gap / 1000).toFixed(1)} s before segment ${hms(meta.id)}`);
+  const secs = (meta.end - meta.id) / 1000;
+  if (Math.abs(secs - camCfg.segSec) > 2 || CAM.segs.length % 30 === 1) camLog(`segment ${hms(meta.id)} ${secs.toFixed(1)} s ${mb(meta.size)}${meta.locked ? ' locked' : ''}`);
+  await camPrune(camCap());
+  camUi();
+}
+async function camWrite(meta, blob) {
+  for (;;) {
+    const data = CAM.ab ? await blob.arrayBuffer() : blob;   // read before the transaction: awaiting inside one would end it
+    const t = CAM.db.transaction(['seg', 'blob'], 'readwrite');
+    try {
+      t.objectStore('seg').put(meta); t.objectStore('blob').put(data, meta.id);
+      await idbDone(t);
+      return true;
+    } catch (e) {
+      try { t.abort(); } catch {}
+      if (e && e.name === 'DataCloneError' && !CAM.ab) { CAM.ab = true; camLog('storing video as raw data instead of Blob'); continue; }
+      camLog(`segment write FAILED (${mb(blob.size)}): ${e && e.name} ${e && e.message}`);
+      await camQuota(); await camPrune(Math.min(camCap(), camUsed() * 0.9));
+      return false;
+    }
+  }
+}
+async function camPrune(cap) {
+  let total = camUsed(); if (total <= cap) return;
+  const t = CAM.db.transaction(['seg', 'blob'], 'readwrite'); let n = 0;
+  for (const s of CAM.segs.slice()) {
+    if (total <= cap) break;
+    if (s.locked) continue;
+    t.objectStore('seg').delete(s.id); t.objectStore('blob').delete(s.id);
+    total -= s.size; CAM.segs.splice(CAM.segs.indexOf(s), 1); n++;
+  }
+  await idbDone(t);
+  if (n) camLog(`pruned ${n} old segments, now ${mb(total)}`);
+}
+
+// on and off. camCfg.on is his switch: while it's on, the dash cam records whenever TARS Drive is on screen.
+async function camStart(fromTap) {
+  if (CAM.on || CAM.starting || CAM.demo) return;
+  CAM.starting = true; CAM.err = ''; camUi();
+  try {
+    const motion = fromTap ? camAskMotion() : null;   // iOS only asks for motion inside a tap
+    if (camReady) await camReady;
+    if (!CAM.db) { CAM.err = 'Storage unavailable'; camLog('no storage: ' + CAM.dbErr); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { CAM.err = 'No camera access here'; return; }
+    let stream;
+    try { stream = await camGetStream(); }
+    catch (e) {
+      CAM.err = e.name === 'NotAllowedError' ? 'Camera blocked' : 'Camera: ' + e.name;
+      camLog('camera error: ' + e.name + ' ' + e.message);
+      if (fromTap) toast(e.name === 'NotAllowedError' ? 'The camera is blocked: allow it for TARS when iOS asks' : 'The camera didn’t start: ' + e.name);
+      return;
+    }
+    if (motion) await motion;
+    CAM.mime = camMime();
+    if (CAM.mime === null) { CAM.err = 'This phone can’t record video here'; camLog('no MediaRecorder'); stream.getTracks().forEach(t => t.stop()); return; }
+    if (!camCfg.on || document.visibilityState !== 'visible') { stream.getTracks().forEach(t => t.stop()); return; }   // switched off or left meanwhile
+    if (CAM.stream && CAM.stream !== stream) CAM.stream.getTracks().forEach(t => t.stop());
+    if (CAM.aimStream) { CAM.aimStream.getTracks().forEach(t => t.stop()); CAM.aimStream = null; }
+    CAM.stream = stream; camWatchTrack(); camAimAttach();
+    Object.assign(CAM, { on: true, started: Date.now(), lastEnd: 0, empty: 0, wait: null, fails: [] });
+    CAM.cur = camSegStart();
+    if (!CAM.cur) { CAM.err = 'The recorder wouldn’t start'; CAM.on = false; stream.getTracks().forEach(t => t.stop()); CAM.stream = null; return; }
+    wakeOn(); camQuota();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().then(p => { CAM.persisted = p; camLog('persistent storage: ' + p); }).catch(() => {});
+    const st = stream.getVideoTracks()[0].getSettings();
+    camLog(`START v${VERSION} ${st.width}x${st.height}@${st.frameRate ? Math.round(st.frameRate) : '?'} ${CAM.mime || 'default'} ${camCfg.kbps}kbps seg ${camCfg.segSec}s`);
+    camSyncSoon();
+  } finally { CAM.starting = false; camUi(); }
+}
+function camStop(why) {
+  if (!CAM.on) { camUi(); return; }
+  CAM.on = false; camSegEnd(CAM.cur); CAM.cur = null;
+  const s = CAM.stream;                              // the last segment needs the track while it finishes stopping
+  setTimeout(() => { if (!CAM.on && s && CAM.stream === s) { s.getTracks().forEach(t => t.stop()); CAM.stream = null; camAimAttach(); camUi(); } }, 1500);
+  camLog(`STOP (${why}) after ${Math.round((Date.now() - CAM.started) / 60000)} min`);
+  camUi(); camSyncSoon();
+}
+function camTurnOn() { camCfg.on = true; saveCamCfg(); store.set('camOffered', 9); camStart(true); }
+function camTurnOff() { camCfg.on = false; saveCamCfg(); camStop('turned off'); }
+function camWatchTrack() {
+  const tr = CAM.stream.getVideoTracks()[0], during = () => T.st === 'listening' || T.st === 'arming' ? ' while TARS listened' : '';
+  tr.addEventListener('ended', () => { camLog('camera track ended' + during()); camUi(); });
+  tr.addEventListener('mute', () => { CAM.mutedAt = Date.now(); camLog('camera track muted' + during()); camUi(); });
+  tr.addEventListener('unmute', () => { camLog(`camera track unmuted after ${((Date.now() - CAM.mutedAt) / 1000).toFixed(1)} s`); camUi(); });
+}
+// iOS takes the camera away when the app leaves the screen: close the segment cleanly, then pick up again on return.
+function camHidden() {
+  CAM.hiddenAt = Date.now();
+  if (CAM.on && CAM.cur) { camSegEnd(CAM.cur); CAM.cur = null; camLog('app hidden, recording paused'); }
+}
+async function camVisible() {
+  camSyncSoon();
+  if (!camCfg.on || CAM.demo) return;
+  if (!CAM.on) { if (!CAM.starting) camStart(false); return; }
+  if (CAM.hiddenAt) camLog(`app visible again after ${((Date.now() - CAM.hiddenAt) / 1000).toFixed(1)} s`);
+  if (!camTrack()) await camReopen('back on screen');
+  if (CAM.on && !CAM.cur && !CAM.wait && camTrack()) CAM.cur = camSegStart();
+  wakeOn(); camUi();
+}
+async function camReopen(why) {
+  if (CAM.reopening) return;
+  CAM.reopening = true; CAM.reopenAt = Date.now();
+  try {
+    const s = await camGetStream();
+    if (!CAM.on) { s.getTracks().forEach(t => t.stop()); return; }
+    if (CAM.stream) CAM.stream.getTracks().forEach(t => t.stop());
+    CAM.stream = s; camWatchTrack(); camAimAttach(); camLog('camera reopened (' + why + ')');
+    if (!CAM.cur && !CAM.wait && document.visibilityState === 'visible') CAM.cur = camSegStart();
+  } catch (e) {
+    camLog('camera reopen failed: ' + e.name);
+    CAM.err = e.name === 'NotAllowedError' ? 'Camera blocked' : 'The camera stopped';
+    camStop('the camera could not reopen');
+  } finally { CAM.reopening = false; camUi(); }
+}
+function camTick() {
+  if (CAM.on && !CAM.demo) {
+    const now = Date.now();
+    if (CAM.wait && now - CAM.wait.t1 > 4000) { camLog('recorder slow to stop, moving on'); CAM.wait = null; }
+    if (CAM.cur && (CAM.cur.failed || CAM.cur.r.state === 'inactive')) {
+      camLog('recorder stopped by itself, restarting'); const dead = CAM.cur; CAM.cur = null; camSegEnd(dead);
+      CAM.fails = CAM.fails.filter(x => now - x < 30000); CAM.fails.push(now);
+      if (CAM.fails.length >= 5) { CAM.err = 'The recorder kept failing'; camStop('the recorder kept failing'); }
+    }
+    if (CAM.on && CAM.cur && now - CAM.cur.t0 >= camCfg.segSec * 1000) camRotate();
+    // Back on screen with the camera gone: reopen it, but never while the microphone is open.
+    if (CAM.on && document.visibilityState === 'visible' && T.st !== 'listening' && T.st !== 'arming' && !CAM.micBusy) {
+      const tr = CAM.stream && CAM.stream.getVideoTracks()[0];
+      if ((!tr || tr.readyState === 'ended') && !CAM.reopening && now - CAM.reopenAt > 5000) camReopen('the camera stopped');
+      else if (!CAM.cur && !CAM.wait && camTrack()) CAM.cur = camSegStart();
+    }
+    if (CAM.on && MO.sideways && now - MO.sideways > 3000 && !CAM.sideToast) {
+      CAM.sideToast = true; camLog('phone sideways with the screen upright: Portrait Orientation Lock');
+      toast('Portrait Orientation Lock is on, so the dash cam records sideways. Turn it off in Control Centre.');
+    }
+  }
+  camUi();
+}
+
+// saves
+async function camPutSave(v) { try { await idb(camOS('saves', 'readwrite').put(v)); } catch (e) { camLog('save write failed: ' + e.message); } }
+async function camAddSave(v) {
+  while (CAM.saves.some(x => x.id === v.id)) v.id++;  // the store is keyed by time
+  if (!v.rid) v.rid = 'p' + v.id;
+  CAM.saves.push(v); await camPutSave(v); await camRelock();
+}
+async function camSave(reason, t = Date.now(), g) {
+  if (!CAM.db) return null;
+  const before = reason === 'voice' ? camCfg.voiceBefore : camCfg.before;
+  const v = { id: Math.round(t), from: Math.round(t - before * 1000), to: Math.round(t + camCfg.after * 1000), reason };
+  if (g) v.g = +g.toFixed(2);
+  await camAddSave(v);
+  camFlash();
+  toast(reason === 'impact' ? `Knock, ${v.g} g: clip saved` : `Clip saved: ${before} s before${reason === 'voice' ? ' you asked' : ''}, ${camCfg.after} s after`);
+  camLog(`SAVE ${reason}${g ? ' ' + v.g + 'g' : ''} ${hms(v.from)}–${hms(v.to)}`);
+  camUi(); camSyncSoon();
+  if (sheetName === 'cam') camRenderSaves();
+  return v;
+}
+function camCanServe(q) {                             // only marks this app has footage for; the rest stay for the Dash Cam app
+  const from = q.from - CP.off, to = q.to - CP.off;
+  return (CAM.on && CAM.started && to > CAM.started) || CAM.segs.some(s => s.id < to && s.end > from);
+}
+async function camRemoteSave(q) {                    // "save that" sent to TARS from Telegram, arriving through the PC (PC times)
+  const v = { id: Math.round(q.ms - CP.off), from: Math.round(q.from - CP.off), to: Math.round(q.to - CP.off), reason: 'tars', rid: q.id, note: q.note || '', reg: true };
+  await camAddSave(v);
+  camFlash(); toast('TARS: saving that');
+  camLog(`TARS mark ${q.id}${v.note ? ' "' + v.note + '"' : ''} ${hms(v.from)}–${hms(v.to)}`);
+  camAck(v); camUi();
+  if (sheetName === 'cam') camRenderSaves();
+}
+async function camRelock() {
+  const t = CAM.db.transaction('seg', 'readwrite'), os = t.objectStore('seg');
+  for (const s of CAM.segs) { const l = camLocked(s); if (l !== !!s.locked) { s.locked = l; os.put(s); } }
+  await idbDone(t);
+}
+async function camUnsave(id) {
+  CAM.saves = CAM.saves.filter(v => v.id !== id);
+  await idb(camOS('saves', 'readwrite').delete(id));
+  await camRelock(); camLog('save removed ' + hms(id));
+}
+
+// the link to the PC's dash cam server: TARS marks come down, saved stretches go up
+const turnBusy = () => T.st !== 'idle' && T.st !== 'error';
+function camBase() { const b = pcBase(); return b ? b.replace(/\/car$/, '') : ''; }
+async function camApi(path, opts = {}, timeout = 15000) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const r = await fetch(camBase() + path, { ...opts, signal: ctl.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status === 404 ? 'no dash cam server on the PC' : 'PC said ' + r.status);
+    return await r.json();
+  } catch (e) { throw e.name === 'AbortError' ? new Error('timed out') : e instanceof TypeError ? new Error("can't reach the PC") : e; }
+  finally { clearTimeout(tm); }
+}
+const camJson = body => ({ method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+async function camAck(v) {
+  try { await camApi('/api/ack?mark=' + encodeURIComponent(v.rid), { method: 'POST' }); v.acked = true; await camPutSave(v); } catch {}
+}
+async function camPoll() {
+  const t0 = Date.now();
+  const j = await camApi(`/api/poll?rec=${camRecording() ? 1 : 0}&v=drive-${VERSION}`, {}, 8000);
+  const t1 = Date.now();
+  CP.rtt = t1 - t0;
+  if (CP.rtt < 2000 || !CP.seen) CP.off = j.now - (t0 + t1) / 2;    // only a quick round trip gives a good clock reading
+  if (!CP.ok) camLog(`linked to the PC (${CP.rtt} ms, PC clock ${CP.off >= 0 ? '+' : ''}${(CP.off / 1000).toFixed(2)} s)`);
+  CP.ok = true; CP.seen = t1; CP.err = '';
+  for (const q of j.requests || []) {
+    const have = CAM.saves.find(v => v.rid === q.id);
+    if (have) { if (!have.acked) camAck(have); continue; }
+    if (camCanServe(q)) await camRemoteSave(q);
+    else if (!CP.skipped.has(q.id)) { CP.skipped.add(q.id); camLog(`TARS mark ${q.id} is from before this app's footage: left for the Dash Cam app`); }
+  }
+}
+async function camRegister() {                       // saves made here, so the PC knows to expect them
+  for (const v of CAM.saves) {
+    if (v.reg || v.reason === 'tars') continue;
+    await camApi('/api/save', camJson({ id: v.rid, ms: Math.round(v.id + CP.off), from: Math.round(v.from + CP.off), to: Math.round(v.to + CP.off), reason: v.reason, g: v.g }));
+    v.reg = true; await camPutSave(v);
+  }
+}
+function camUploadable(v) {
+  if (!v.reg || v.done || Date.now() < v.to + 1500) return false;
+  if (CAM.segs.some(s => s.end >= v.to)) return true; // the segment holding the end of the window is stored
+  if (CAM.cur && CAM.cur.t0 < v.to) return false;     // ...or still recording
+  return !CAM.wait && !CAM.writing;                  // ...or still being saved; otherwise recording stopped before the end
+}
+async function camUploadNext() {
+  if (CP.busy || !CP.ok || turnBusy()) return;      // while TARS listens or talks, his voice gets the signal first
+  const v = CAM.saves.filter(camUploadable).sort((a, b) => a.id - b.id)[0];
+  if (!v) return;
+  CP.busy = true; camUi();
+  let sent = false, held = false;
+  try {
+    const segs = camSegsFor(v.from, v.to), q = `mark=${encodeURIComponent(v.rid)}&off=${Math.round(CP.off)}`;
+    v.sent = v.sent || [];
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (v.sent.includes(s.id) || s.up) continue;  // s.up: already on the PC for an overlapping save
+      if (turnBusy()) { held = true; break; }
+      CP.cur = `${i + 1}/${segs.length}`; camUi();
+      const b = await camBlob(s);
+      if (!b) { camLog('missing video for segment ' + hms(s.id)); continue; }
+      await camApi(`/api/seg?${q}&id=${s.id}&end=${s.end}`, { method: 'PUT', headers: { 'Content-Type': s.mime || 'video/mp4' }, body: b }, 180000);
+      v.sent.push(s.id); await camPutSave(v);
+      s.up = true; try { await idb(camOS('seg', 'readwrite').put(s)); } catch {}
+    }
+    if (held) { if (!CAM.waitLogged.has(v.rid)) { CAM.waitLogged.add(v.rid); camLog(`upload ${v.rid} waits for TARS to finish`); } }
+    else {
+      if (segs.length) {
+        const pts = await idb(camOS('gps').getAll(IDBKeyRange.bound(v.from - 5000, v.to + 5000)));
+        if (pts.length) await camApi(`/api/gps?${q}`, camJson({ points: pts }));
+      }
+      await camApi(`/api/done?${q}&n=${segs.length}`, { method: 'POST' });
+      v.done = true; await camPutSave(v); sent = true;
+      camLog(`uploaded ${v.rid}: ${segs.length} parts, ${mb(segs.reduce((a, s) => a + s.size, 0))}`);
+    }
+  } catch (e) { camLog(`upload ${v.rid} paused: ${e.message}`); }
+  finally { CP.busy = false; CP.cur = ''; camUi(); if (sheetName === 'cam') camRenderSaves(); }
+  if (sent) camSyncSoon();                           // more to send? go again straight away (after a failure, the next poll retries)
+}
+async function camSyncLoop() {
+  clearTimeout(CP.timer);
+  if (CP.polling) return;
+  if (CAM.demo || !camBase() || document.visibilityState === 'hidden' || !(camCfg.on || CAM.saves.some(v => !v.done))) {
+    CP.ok = false; camUi(); CP.timer = setTimeout(camSyncLoop, 5000); return;
+  }
+  CP.polling = true;
+  try { await camPoll(); await camRegister(); camUploadNext(); }
+  catch (e) { if (CP.ok || !CP.err) camLog('PC link down: ' + e.message); CP.ok = false; CP.err = e.message; }
+  finally { CP.polling = false; camUi(); CP.timer = setTimeout(camSyncLoop, CAM.on ? 3000 : 15000); }
+}
+function camSyncSoon() { if (!CP.polling) { clearTimeout(CP.timer); CP.timer = setTimeout(camSyncLoop, 300); } }
+
+// knocks. A knock in the mount saves a clip. A knock while parked only counts if the phone sat still before it and is
+// still pointing the same way after: on 21 Oct all three "impacts" were the phone being picked up or put down.
+async function camAskMotion() {
+  if (MO.ok || !window.DeviceMotionEvent) return;
+  try {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const r = await DeviceMotionEvent.requestPermission();
+      if (r !== 'granted') { MO.denied = true; camLog('motion permission: ' + r); return; }
+    }
+    MO.denied = false; MO.ok = true; store.set('camMotion', true);
+    window.addEventListener('devicemotion', camMotion); camLog('motion sensor on');
+  } catch (e) { camLog('motion permission: ' + (e.message || e.name)); }
+}
+const camMoving = () => driving() || !!(G.fix && Date.now() - G.fix.t < 10000 && (G.fix.spd || 0) * 3.6 >= 10);
+function camMotion(e) {
+  const a = e.acceleration, b = e.accelerationIncludingGravity, r = e.rotationRate, now = Date.now();
+  if (b && b.x != null) {
+    MO.grav = MO.grav ? MO.grav.map((v, i) => v + ([b.x, b.y, b.z][i] - v) * 0.1) : [b.x, b.y, b.z];   // gravity, low-passed
+    const sideways = Math.abs(b.x) > 7 && Math.abs(b.y) < 5 && innerHeight > innerWidth;
+    MO.sideways = sideways ? (MO.sideways || now) : 0;
+  }
+  const rot = r && r.alpha != null ? Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0) : 0;   // degrees a second
+  MO.hist.push({ t: now, g: MO.grav && MO.grav.slice(), rot });
+  while (MO.hist.length && now - MO.hist[0].t > 4000) MO.hist.shift();
+  let g;
+  if (a && a.x != null) g = Math.hypot(a.x, a.y, a.z) / 9.81;
+  else if (b && b.x != null) g = Math.abs(Math.hypot(b.x, b.y, b.z) / 9.81 - 1);
+  else return;
+  if (g > MO.peak) MO.peak = g;
+  if (MO.pending) { MO.pending.g = Math.max(MO.pending.g, g); return; }
+  if (!CAM.on || !camCfg.impact || g < camCfg.impactG || now - MO.lastSave < 15000) return;
+  const prior = MO.hist.filter(h => h.t <= now - 150 && h.t >= now - 1500);
+  MO.pending = { t: now, g, grav: prior.length ? prior[0].g : null, rot: prior.reduce((m, h) => Math.max(m, h.rot), 0), moving: camMoving() };
+  setTimeout(camKnock, 2500);                        // decide once the phone has settled
+}
+function camKnock() {
+  const k = MO.pending; MO.pending = null;
+  if (!k || !CAM.on) return;
+  const a = k.grav, b = MO.grav, la = a && Math.hypot(...a), lb = b && Math.hypot(...b);
+  const ang = a && b && la && lb ? Math.acos(clamp((a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb), -1, 1)) * 180 / Math.PI : 0;
+  const moving = k.moving || camMoving();
+  const what = `${k.g.toFixed(2)} g, turned ${Math.round(ang)}°, ${Math.round(k.rot)}°/s before, ${moving ? 'moving' : 'not moving'}`;
+  if (!moving && (ang > 20 || k.rot > 45)) { camLog(`knock ignored, the phone was being handled: ${what}`); return; }
+  MO.lastSave = k.t; camLog(`knock: ${what}`);
+  camSave('impact', k.t, k.g);
+}
+function camGps(c) {                                 // the track that goes to the PC with a clip
+  if (!CAM.on || !CAM.db) return;
+  const now = Date.now(); if (now - CAM.gpsAt < 1000) return;
+  CAM.gpsAt = now;
+  try { camOS('gps', 'readwrite').put({ t: now, lat: c.latitude, lon: c.longitude, acc: Math.round(c.accuracy), spd: c.speed, hdg: c.heading }); } catch {}
+}
+
+// the REC light, Save clip, the flash
+const camRecording = () => CAM.demo || (CAM.on && !!camTrack() && document.visibilityState === 'visible');
+function camState() {
+  if (CAM.demo) return 'rec';
+  if (!camCfg.on) return 'off';
+  if (CAM.starting) return 'starting';
+  if (!CAM.on) return CAM.err ? 'bad' : 'starting';
+  const tr = CAM.stream && CAM.stream.getVideoTracks()[0];
+  if (!tr || tr.readyState === 'ended') return 'paused';    // reopens by itself (after TARS's question, or back on screen)
+  return tr.muted ? 'paused' : 'rec';
+}
+let camShown = '';
+function camUi() {
+  const st = camState(), chip = $('#camchip');
+  if (st === 'rec') CAM.wasRec = true;
+  else if (st === 'off') CAM.wasRec = false;
+  else if (st === 'bad' && CAM.wasRec) { CAM.wasRec = false; speakLocal('The dash cam stopped.'); }   // only heard while driving
+  const el = CAM.started ? Math.max(0, Math.floor((Date.now() - CAM.started) / 1000)) : 0;
+  const clock = el >= 3600 ? `${Math.floor(el / 3600)}:${two(Math.floor(el / 60) % 60)}:${two(el % 60)}` : `${Math.floor(el / 60)}:${two(el % 60)}`;
+  const txt = st === 'rec' ? `REC <span class="el">${clock}</span>` : st === 'paused' ? 'PAUSED' : st === 'starting' ? 'CAM…' : 'CAM ✕';
+  const key = st + txt + (CP.busy ? '↑' : '');
+  if (chip && key !== camShown) {
+    camShown = key; chip.hidden = st === 'off';
+    chip.className = 'chip camchip ' + st; chip.innerHTML = `<i class="dot"></i>${txt}${CP.busy ? ' ↑' : ''}`;
+  }
+  document.documentElement.classList.toggle('camrec', st === 'rec' || st === 'paused');
+  const rec = camRecording();
+  if (rec !== CAM.quickShown) { CAM.quickShown = rec; renderQuick(); }
+  if (sheetName === 'cam' && Date.now() - (CAM.statAt || 0) > 1500) { CAM.statAt = Date.now(); camStatusCard(); }
+}
+function camChipTap() {
+  wakeOn();
+  const st = camState();
+  if (st === 'starting') return;
+  if (st === 'bad' || !CAM.on) { camStart(true); return; }
+  if (driving()) { toast(`Dash cam recording · ${mb(camUsed())} kept. Say “save that” or tap Save clip.`); return; }
+  openSheet('cam');
+}
+function camFlash() { const f = $('#camflash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on'))); }
+function camOfferTick() {
+  // The dash cam is new in TARS Drive: offer it once, where GO and PLAY appear (✕ is "not now"; Settings has it too)
+  if (CAM.offered || CAM.demo || camCfg.on || store.get('camOffered', 0) || !pcBase() || performance.now() < 3000) return;
+  if (driving() || T.st !== 'idle' || sheetName || !$('#action').hidden || !$('#modal').hidden || document.visibilityState !== 'visible') return;
+  CAM.offered = true; store.set('camOffered', 1);
+  showAction({ title: 'Dash cam, built in', sub: 'Records the road while TARS Drive is open', button: 'TURN ON', run: camTurnOn });
+}
+
+// the Dash cam sheet (parked only, like every menu)
+const CAM_SETTINGS = [
+  ['before', 'Keep before a save', 's', 'Save clip and knocks', 5, 120],
+  ['voiceBefore', 'Keep before “save that”', 's', 'Counted from when you tapped TARS', 5, 120],
+  ['after', 'Keep after a save', 's', '', 0, 120],
+  ['capGB', 'Storage limit', 'GB', 'Past this, the oldest unsaved footage goes', 1, 64],
+  ['impactG', 'Knock trigger', 'g', 'Higher = fewer saves from potholes', 1, 8],
+  ['kbps', 'Video bitrate', 'kbps', '2500 ≈ 1.1 GB an hour', 800, 8000],
+  ['height', 'Resolution', 'p', '720 or 1080', 480, 1080],
+  ['fps', 'Frame rate', 'fps', '', 10, 30],
+  ['segSec', 'Segment length', 's', 'Footage is stored in pieces this long', 5, 30],
+];
+function camSheet(B) {
+  const a = sheetArg || {};
+  B.innerHTML = `
+    ${a.play ? `<div class="card"><h3>${esc(a.play.title)}</h3><video id="cplayer" class="camplayer" controls playsinline muted></video><p class="note" id="cplayinfo"></p>
+      <div class="acts"><button class="btn small" data-cam="closeplay">Close the player</button></div></div>` : ''}
+    <div class="card" id="camstat"></div>
+    <div class="card"><h3>Aim</h3><p>Tilt the phone until the road fills most of the picture and the dashed line sits on the horizon.</p>
+      <div class="aim" id="aimbox"${CAM.aim ? '' : ' hidden'}><video id="aimv" playsinline muted autoplay></video><i></i></div>
+      <div class="acts"><button class="btn" data-cam="aim">${icon('cam')}<span>${CAM.aim ? 'Hide the camera' : 'Show the camera'}</span></button></div></div>
+    <div class="card"><h3>Saved clips</h3><div id="camsaves"></div></div>
+    <div class="card"><h3>Drives</h3><p>Everything recorded, newest first, in 5-minute pieces. The oldest footage that isn’t saved makes room for new.</p><div id="camdrives"></div></div>
+    <div class="card"><h3>Settings</h3>${camSettingsHtml()}</div>
+    <div class="card"><h3>Log</h3><pre class="camlog" id="camlog"></pre><div class="acts"><button class="btn small" data-cam="sharelog">Share the log</button></div></div>`;
+  camStatusCard(); camRenderSaves(); camRenderDrives();
+  $('#camlog', B).textContent = CAM.log.slice(-40).reverse().join('\n') || 'Nothing yet.';
+  if (CAM.aim) camAimAttach();
+  if (a.play) camPlay(a.play.segs);
+  B.onclick = camSheetClick;
+  B.onchange = e => {
+    const inp = e.target.closest('[data-camset]'); if (!inp) return;
+    const [k, , , , min, max] = CAM_SETTINGS.find(x => x[0] === inp.dataset.camset);
+    const v = clamp(+inp.value || CAM_DEFAULTS[k], min, max); inp.value = v; camCfg[k] = v; saveCamCfg(); camLog(`setting ${k} = ${v}`); camStatusCard();
+  };
+}
+function camStatusCard() {
+  const el = $('#camstat'); if (!el) return;
+  const st = camState(), tr = camTrack(), s = tr ? tr.getSettings() : null, rate = camCfg.kbps * 1000 / 8;
+  const head = { rec: 'Recording', paused: 'Paused by iOS', starting: 'Starting…', bad: CAM.err || 'Stopped', off: 'Off' }[st];
+  const lines = [];
+  if (st === 'rec' || st === 'paused') lines.push(`Since ${hm(new Date(CAM.started))}${s && s.width ? ` · ${s.width}×${s.height} at ${Math.round(s.frameRate || camCfg.fps)} fps` : ''} · ${(camCfg.kbps / 1000).toFixed(1)} Mbps · no sound`);
+  if (st === 'off') lines.push('Turn it on and it records the road whenever TARS Drive is open.');
+  if (st === 'bad') lines.push(CAM.err === 'Camera blocked' ? 'Allow the camera when iOS asks. If it never asks: iPhone Settings → Apps → Safari → Camera → Ask, then reopen TARS.' : 'Tap Start to try again.');
+  const saved = CAM.segs.filter(x => x.locked).reduce((a, x) => a + x.size, 0), left = CAM.saves.filter(v => !v.done).length;
+  lines.push(`On this phone: ${mb(camUsed())} of ${mb(camCap())} (about ${dur(camCap() / rate * 1000)} of driving) · saved clips ${mb(saved)}`);
+  lines.push(!camBase() ? 'Not linked: link TARS in Settings and clips go to your PC by themselves.'
+    : CP.ok ? `PC linked ✓${CP.busy ? ` · sending ${CP.cur}` : ''}${left ? ` · ${left} to send` : ''}${turnBusy() && left ? ' (after TARS)' : ''}`
+    : `PC not reachable${CP.err ? ': ' + esc(CP.err) : ''}${left ? ` · ${left} to send` : ''}`);
+  el.innerHTML = `<h3><span class="camdot ${st}"></span>${esc(head)}</h3>${lines.map(l => `<p>${l}</p>`).join('')}
+    <div class="acts">${st === 'rec' || st === 'paused' ? `<button class="btn hot" data-cam="save">Save the last ${camCfg.before} s</button>` : ''}
+      <button class="btn${st === 'off' ? ' hot' : ''}" data-cam="${st === 'bad' ? 'retry' : 'toggle'}">${st === 'off' ? 'Turn on' : st === 'bad' ? 'Start' : 'Turn off'}</button></div>`;
+}
+const camReason = v => v.reason === 'impact' ? `Knock, ${v.g} g` : v.reason === 'tars' ? 'TARS' + (v.note ? `: ${v.note}` : '') : v.reason === 'voice' ? '“Save that”' : 'Save clip';
+function camSaveState(v) {
+  if (Date.now() < v.to) return 'still recording';
+  if (!camBase()) return 'link TARS to send it to the PC';
+  if (v.done) return 'on the PC ✓';
+  return CP.busy ? 'sending…' : 'waiting to send';
+}
+function camRenderSaves() {
+  const L = $('#camsaves'); if (!L) return;
+  const saves = CAM.saves.slice().sort((a, b) => b.id - a.id);
+  L.innerHTML = saves.length ? saves.map(v => {
+    const segs = camSegsFor(v.from, v.to), sz = segs.reduce((a, s) => a + s.size, 0), key = 'save:' + v.id;
+    return `<div class="camrow"><div class="t">${esc(camDay(v.id))} ${hms(v.id)} · ${esc(camReason(v))}</div>
+      <div class="s">${segs.length ? `${Math.round((v.to - v.from) / 1000)} s · ${mb(sz)}` : 'no footage on this phone'} · ${esc(camSaveState(v))}</div>
+      <div class="acts">${segs.length ? `<button class="btn small" data-cplay="${key}">Play</button><button class="btn small${CAM.ready.has(key) ? ' hot' : ''}" data-cshare="${key}">${CAM.ready.has(key) ? 'Share now' : 'Share'}</button>` : ''}
+        <button class="btn small danger" data-cdel="${v.id}">Delete</button></div></div>`;
+  }).join('') : '<div class="empty">No saved clips yet. Say “save that”, tap Save clip, or a real knock saves one by itself.</div>';
+}
+function camDrives() {
+  const drives = [];
+  for (const s of CAM.segs) {
+    const d = drives[drives.length - 1];
+    if (d && s.id - d.end < 120000) { d.segs.push(s); d.end = Math.max(d.end, s.end); } else drives.push({ start: s.id, end: s.end, segs: [s] });
+  }
+  return drives.reverse();
+}
+function camRenderDrives() {
+  const L = $('#camdrives'); if (!L) return;
+  const drives = camDrives();
+  let h = '';
+  for (const d of drives.slice(0, 20)) {
+    h += `<div class="camdrive mono">${esc(camDay(d.start))} ${hm(new Date(d.start))}–${hm(new Date(d.end))} · ${Math.max(1, Math.round((d.end - d.start) / 60000))} min</div>`;
+    const blocks = new Map();
+    for (const s of d.segs) { const b = Math.floor(s.id / 300000) * 300000; if (!blocks.has(b)) blocks.set(b, []); blocks.get(b).push(s); }
+    for (const [b, segs] of [...blocks].reverse()) {
+      const key = 'blk:' + b;
+      h += `<div class="camrow"><div class="t">${hm(new Date(b))}–${hm(new Date(b + 300000))}</div><div class="s">${segs.length} parts · ${mb(segs.reduce((a, s) => a + s.size, 0))}${segs.some(s => s.locked) ? ' · has a saved clip' : ''}</div>
+        <div class="acts"><button class="btn small" data-cplay="${key}">Play</button><button class="btn small${CAM.ready.has(key) ? ' hot' : ''}" data-cshare="${key}">${CAM.ready.has(key) ? 'Share now' : 'Share'}</button></div></div>`;
+    }
+  }
+  L.innerHTML = (h || '<div class="empty">Nothing recorded yet.</div>')
+    + `<p class="note">${CAM.segs.length} parts, ${mb(camUsed())} of ${mb(camCap())}${isFinite(CAM.quota) ? `; iOS allows TARS ${mb(CAM.quota)}` : ''}${CAM.persisted ? ', kept for good' : ''}.</p>`;
+}
+function camItem(key) {
+  const [kind, id] = key.split(':'), n = +id;
+  if (kind === 'save') { const v = CAM.saves.find(x => x.id === n); return v ? { title: `${camDay(v.id)} ${hms(v.id)} · ${camReason(v)}`, segs: camSegsFor(v.from, v.to) } : null; }
+  return { title: `${camDay(n)} ${hm(new Date(n))}–${hm(new Date(n + 300000))}`, segs: CAM.segs.filter(s => Math.floor(s.id / 300000) * 300000 === n) };
+}
+async function camSheetClick(e) {
+  const b = e.target.closest('[data-cam],[data-cplay],[data-cshare],[data-cdel],[data-seg="camimpact"] button'); if (!b) return;
+  const act = b.dataset.cam;
+  if (act === 'save') { camSave('button'); return; }
+  if (act === 'retry') { camStart(true); return; }
+  if (act === 'toggle') {
+    if (!camCfg.on) { camTurnOn(); return; }
+    modal('Turn the dash cam off?', 'It stops recording until you turn it on again. Saved clips stay.', [{ label: 'Keep recording' }, { label: 'Turn off', hot: true, run: () => { camTurnOff(); camStatusCard(); } }]);
+    return;
+  }
+  if (act === 'aim') { if (CAM.aim) camAimOff(); else camAimOn(); return; }
+  if (act === 'closeplay') { camPlayerOff(); sheetArg = null; renderSheet(); return; }
+  if (act === 'motion') { await camAskMotion(); renderSheet(); return; }
+  if (act === 'sharelog') {
+    const f = new File([CAM.log.join('\n')], `tars_dashcam_log_${ymd(Date.now())}.txt`, { type: 'text/plain' });
+    try { await camShareFiles([f], 'log'); } catch (er) { if (er.name !== 'AbortError') camLog('log share failed: ' + er.message); }
+    return;
+  }
+  if (b.parentElement && b.parentElement.dataset.seg === 'camimpact') {
+    camCfg.impact = b.dataset.v === '1'; saveCamCfg();
+    b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    if (camCfg.impact && !MO.ok) camAskMotion();
+    return;
+  }
+  if (b.dataset.cplay) {
+    const it = camItem(b.dataset.cplay); if (!it || !it.segs.length) return;
+    sheetArg = { play: it }; renderSheet(); $('#sheetbody').scrollTop = 0; return;
+  }
+  if (b.dataset.cshare) {
+    const key = b.dataset.cshare;
+    if (CAM.ready.has(key)) { try { await camShareFiles(CAM.ready.get(key), key); } catch (er) { if (er.name !== 'AbortError') camLog('share failed: ' + er.message); } return; }
+    const it = camItem(key); if (!it || !it.segs.length) return;
+    b.textContent = 'Preparing…';                    // iOS shares straight from a tap only, so: prepare, then Share now
+    try { CAM.ready.set(key, await camFilesFor(it.segs)); b.textContent = 'Share now'; b.classList.add('hot'); }
+    catch (er) { b.textContent = 'Share'; camLog('prepare failed: ' + er.message); }
+    return;
+  }
+  if (b.dataset.cdel) {
+    const id = +b.dataset.cdel, v = CAM.saves.find(x => x.id === id); if (!v) return;
+    modal('Delete this saved clip?', `${camReason(v)} at ${hms(v.id)}. The footage on this phone becomes ordinary footage again${v.done ? '; the copy on the PC stays' : ''}.`,
+      [{ label: 'Keep' }, { label: 'Delete', hot: true, run: async () => { await camUnsave(id); CAM.ready.delete('save:' + id); renderSheet(); } }]);
+  }
+}
+function camSettingsHtml() {
+  return CAM_SETTINGS.map(([k, name, unit, help, min, max]) => `<label class="camset"><span><b>${esc(name)}</b> <span class="u">${unit}</span>${help ? `<small>${esc(help)}</small>` : ''}</span>
+      <input class="field" type="number" inputmode="decimal" data-camset="${k}" min="${min}" max="${max}" step="${k === 'impactG' ? '0.1' : '1'}" value="${camCfg[k]}"></label>`).join('')
+    + `<div style="margin-top:14px"><b>Knocks save a clip</b>${seg('camimpact', [['1', 'On'], ['0', 'Off']], camCfg.impact ? '1' : '0')}
+      <p class="note">${MO.ok ? 'Motion sensor on. A knock while you’re parked only counts if the phone stays still in its mount, so picking it up doesn’t save a clip.'
+        : MO.denied ? 'Motion access was refused, so knocks can’t be felt. Close TARS fully and open it again to be asked.'
+        : 'Needs motion access, asked once:'}</p>${MO.ok || MO.denied ? '' : '<div class="acts"><button class="btn small" data-cam="motion">Allow motion</button></div>'}</div>
+    <p class="note">Resolution, frame rate and bitrate apply the next time the dash cam starts. Keep Auto-Lock on Never and Portrait Orientation Lock off.</p>`;
+}
+async function camAimOn() {
+  CAM.aim = true;
+  if (!camTrack()) {                                 // the dash cam is off: open the camera just for the preview
+    try { CAM.aimStream = await camGetStream(); } catch (e) { CAM.aim = false; toast('The camera didn’t start: ' + e.name); return; }
+  }
+  const box = $('#aimbox'); if (box) box.hidden = false;
+  const t = $('[data-cam=aim] span'); if (t) t.textContent = 'Hide the camera';
+  camAimAttach();
+}
+function camAimAttach() {
+  const v = $('#aimv'); if (!v) return;
+  const own = CAM.aimStream && CAM.aimStream.getVideoTracks()[0] && CAM.aimStream.getVideoTracks()[0].readyState === 'live' ? CAM.aimStream : null;
+  const s = !CAM.aim ? null : camTrack() ? CAM.stream : own;
+  if (!s) { if (v.srcObject) v.srcObject = null; return; }
+  if (v.srcObject !== s) { v.srcObject = s; v.play().catch(() => {}); }
+  const st = s.getVideoTracks()[0].getSettings(), box = $('#aimbox');
+  if (box && st.width && st.height) box.style.aspectRatio = `${st.width} / ${st.height}`;
+}
+function camAimOff() {
+  CAM.aim = false;
+  const v = $('#aimv'); if (v) v.srcObject = null;
+  if (CAM.aimStream) { CAM.aimStream.getTracks().forEach(t => t.stop()); CAM.aimStream = null; }
+  const box = $('#aimbox'); if (box) box.hidden = true;
+  const t = $('[data-cam=aim] span'); if (t) t.textContent = 'Show the camera';
+}
+function camPlayerOff() {
+  const p = $('#cplayer'); if (p) { p.onended = null; p.pause(); p.removeAttribute('src'); p.load(); }
+  while (CAM.urls.length) URL.revokeObjectURL(CAM.urls.pop());
+}
+function camPlay(segs) {
+  const p = $('#cplayer'); if (!p || !segs.length) return;
+  let i = 0;
+  const load = async () => {
+    const b = await camBlob(segs[i]);
+    while (CAM.urls.length) URL.revokeObjectURL(CAM.urls.pop());
+    const info = $('#cplayinfo');
+    if (!b) { if (info) info.textContent = 'This part is missing.'; return; }
+    const u = URL.createObjectURL(b); CAM.urls.push(u); p.src = u; p.play().catch(() => {});
+    if (info) info.textContent = `Part ${i + 1} of ${segs.length} · ${hms(segs[i].id)}`;
+  };
+  p.onended = () => { if (++i < segs.length) load(); };
+  load();
+}
+const camStamp = t => { const d = new Date(t); return `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`; };
+async function camFilesFor(segs) {                   // named like the Dash Cam app's, so the PC can cut clips from hand-shared files too
+  const files = [];
+  for (const s of segs) {
+    const b = await camBlob(s); if (!b) continue;
+    const ext = (s.mime || '').includes('webm') ? 'webm' : 'mp4';
+    files.push(new File([b], `dashcam_${camStamp(s.id)}-${String(s.id % 1000).padStart(3, '0')}.${ext}`, { type: s.mime || 'video/mp4' }));
+  }
+  const from = segs[0].id, to = segs[segs.length - 1].end;
+  const pts = await idb(camOS('gps').getAll(IDBKeyRange.bound(from - 5000, to + 5000)));
+  if (pts.length) files.push(new File([JSON.stringify({ from, to, points: pts })], `dashcam_gps_${camStamp(from)}.json`, { type: 'application/json' }));
+  return files;
+}
+async function camShareFiles(files, what) {
+  const can = f => navigator.canShare && navigator.canShare({ files: f });
+  const vids = files.filter(f => !f.name.includes('_gps_'));
+  const set = can(files) ? files : can(vids) ? vids : null;   // some apps refuse the GPS file; the video matters most
+  if (set) { await navigator.share({ files: set }); camLog(`shared ${set.length} files (${what})`); return; }
+  for (const f of files) { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+  camLog(`downloaded ${files.length} files (${what})`);
+}
+
+// Check this phone: prove on the real iPhone that the camera records, and keeps recording while TARS has the microphone
+function camProbe(blob) {
+  return new Promise(done => {
+    const v = document.createElement('video'), u = URL.createObjectURL(blob); let fin = false;
+    const end = r => { if (fin) return; fin = true; clearTimeout(tm); v.removeAttribute('src'); v.load(); URL.revokeObjectURL(u); done(r); };
+    const tm = setTimeout(() => end(null), 8000);
+    const got = () => { if (isFinite(v.duration) && v.duration > 0) end({ dur: v.duration, w: v.videoWidth, h: v.videoHeight }); };
+    v.muted = true; v.playsInline = true; v.preload = 'metadata';
+    v.onloadedmetadata = () => { got(); if (!fin) { v.ondurationchange = got; v.currentTime = 1e7; } };   // some files only learn their length at the end
+    v.onerror = () => end(null);
+    v.src = u;
+  });
+}
+async function camRecordFor(stream, ms, during) {
+  const mime = camMime(), rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 1500000 } : undefined), parts = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) parts.push(e.data); };
+  const stopped = new Promise(ok => { rec.onstop = ok; });
+  const t0 = performance.now(); rec.start();
+  const extra = during ? await during() : null;
+  await sleep(Math.max(0, ms - (performance.now() - t0)));
+  rec.stop(); await stopped;
+  return { blob: new Blob(parts, { type: rec.mimeType || mime || 'video/mp4' }), secs: (performance.now() - t0) / 1000, extra };
+}
+async function camCheck(id) {
+  if (id === 'camstore') {
+    await camQuota();
+    try { if (navigator.storage && navigator.storage.persist && !CAM.persisted) CAM.persisted = await navigator.storage.persist(); } catch {}
+    const q = isFinite(CAM.quota) ? CAM.quota : 0;
+    setCheck('camstore', q >= 2e9, q ? `iOS allows TARS ${mb(q)}, so about ${dur(Math.min(camCfg.capGB * 1e9, q * 0.8) / (camCfg.kbps * 125) * 1000)} of driving${CAM.persisted ? ', kept for good' : ''}` : 'iOS didn’t say how much room there is');
+    return;
+  }
+  setCheck(id, null, 'Running, about ' + (id === 'cam' ? 4 : 8) + ' seconds…');
+  let own = null, stream = camTrack() ? CAM.stream : null;
+  try { if (!stream) { own = await camGetStream(); stream = own; } }
+  catch (e) { setCheck(id, false, e.name === 'NotAllowedError' ? 'Camera permission denied' : 'Camera: ' + e.name); return; }
+  const tr = stream.getVideoTracks()[0], events = [], note = n => () => events.push(n);
+  const on = { mute: note('paused'), unmute: note('resumed'), ended: note('stopped') };
+  Object.entries(on).forEach(([k, f]) => tr.addEventListener(k, f));
+  try {
+    if (id === 'cam') {
+      const r = await camRecordFor(stream, 3500), p = r.blob.size ? await camProbe(r.blob) : null;
+      const ok = !!(p && p.dur >= 2.5 && p.w > 0);
+      setCheck('cam', ok, ok ? `${p.w}×${p.h}, ${p.dur.toFixed(1)} s, ${(r.blob.type || '').split(';')[0]}` : `The test clip didn’t play back (${r.blob.size} bytes)`);
+      return;
+    }
+    // cammic: 7 s of video, with the microphone opened in the middle exactly the way tapping TARS opens it
+    const r = await camRecordFor(stream, 7000, async () => {
+      await sleep(1500);
+      let mic = null, bytes = 0, err = '';
+      CAM.micBusy = true;
+      try {
+        try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch {}
+        mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+        const am = pickAudioMime(), ar = new MediaRecorder(mic, am ? { mimeType: am } : undefined), ap = [];
+        ar.ondataavailable = e => { if (e.data && e.data.size) ap.push(e.data); };
+        const done = new Promise(ok => { ar.onstop = ok; });
+        ar.start(250); await sleep(2500); ar.stop(); await done;
+        bytes = ap.reduce((a, x) => a + x.size, 0);
+      } catch (e) { err = e.name; }
+      finally {
+        try { if (mic) mic.getTracks().forEach(t => t.stop()); } catch {}
+        try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+        CAM.micBusy = false;
+      }
+      return { bytes, err };
+    });
+    const p = r.blob.size ? await camProbe(r.blob) : null, live = tr.readyState === 'live' && !tr.muted, m = r.extra || {};
+    const why = [];
+    if (m.err) why.push('the microphone didn’t open: ' + m.err);
+    else if (m.bytes < 1500) why.push('the microphone recorded nothing');
+    if (!live) why.push('the camera ' + (tr.readyState === 'ended' ? 'stopped' : 'is paused') + ' after the microphone');
+    if (events.length) why.push('camera ' + events.join(', ') + ' during the test');
+    if (!p) why.push('the test clip didn’t play back');
+    else if (p.dur < r.secs - 1.2) why.push(`only ${p.dur.toFixed(1)} s of video for ${r.secs.toFixed(1)} s`);
+    setCheck('cammic', !why.length, why.length ? why.join('; ') : `${p.dur.toFixed(1)} s of video straight through a 2.5 s TARS question; the camera never stopped`);
+    camLog('camera + mic check: ' + JSON.stringify({ ok: !why.length, secs: +r.secs.toFixed(2), clip: p, mic: m, events, live }));
+  } catch (e) { setCheck(id, false, `${e.name}: ${e.message}`); }
+  finally {
+    Object.entries(on).forEach(([k, f]) => tr.removeEventListener(k, f));
+    if (own) own.getTracks().forEach(t => t.stop());
+  }
+}
+function camReport() {
+  const tr = camTrack(), st = tr ? tr.getSettings() : null;
+  return { on: camCfg.on, state: camState(), err: CAM.err, mime: CAM.mime || camMime(), seq: CAM.seq, ab: CAM.ab, cfg: { ...camCfg },
+    track: st ? `${st.width}x${st.height}@${Math.round(st.frameRate || 0)}` : null, segs: CAM.segs.length, used: camUsed(), cap: camCap(),
+    quota: isFinite(CAM.quota) ? CAM.quota : null, persisted: CAM.persisted, motion: MO.ok, link: CP.ok, rtt: CP.rtt,
+    saves: CAM.saves.slice(-20).map(v => ({ reason: v.reason, at: new Date(v.id).toISOString(), done: !!v.done })) };
+}
+
+function camBoot() {
+  camReady = (async () => {
+    try {
+      CAM.db = await camOpenDb();
+      CAM.segs = (await idb(camOS('seg').getAll())).sort((a, b) => a.id - b.id);
+      CAM.saves = await idb(camOS('saves').getAll());
+      const keys = await idb(camOS('log').getAllKeys());
+      if (keys.length > 5000) { const t = CAM.db.transaction('log', 'readwrite'); keys.slice(0, keys.length - 4000).forEach(k => t.objectStore('log').delete(k)); await idbDone(t); }
+      CAM.log = (await idb(camOS('log').getAll())).slice(-1000);
+      if (CAM.segs.length) await idb(camOS('gps', 'readwrite').delete(IDBKeyRange.upperBound(CAM.segs[0].id - 3600e3)));
+    } catch (e) { CAM.db = null; CAM.dbErr = (e && e.message) || String(e); log('dash cam storage: ' + CAM.dbErr); }
+    await camQuota();
+  })();
+  camReady.then(() => {
+    if (CAM.db) camLog(`app opened v${VERSION}, ${CAM.segs.length} segments, ${CAM.saves.length} saves${standalone() ? ', home screen app' : ''}`);
+    camUi();
+    if (camCfg.on && document.visibilityState === 'visible') camStart(false);
+    camSyncLoop();
+  });
+  setInterval(() => { if (CAM.on && MO.ok) camLog(`motion peak last minute ${MO.peak.toFixed(2)} g`); MO.peak = 0; }, 60000);
+  setInterval(camQuota, 300000);
+  // Motion access lasts only as long as the page, and iOS asks for it from a tap: the first tap after opening does it
+  // (no prompt when it was allowed before).
+  document.addEventListener('click', () => { if (camCfg.on && camCfg.impact && !MO.ok && !MO.denied && !MO.tapAsked && store.get('camMotion', false)) { MO.tapAsked = true; camAskMotion(); } }, true);
+  window.addEventListener('pagehide', camHidden);
+}
+
 // ---------- TARS: listen, send, speak ----------
 const voiceEl = $('#voice');
-const T = { st: 'idle', rec: null, stream: null, chunks: [], ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null,
+const T = { st: 'idle', rec: null, stream: null, chunks: [], ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null, tapAt: 0,
   aboveSince: 0, quietSince: 0, heard: false, anyAudio: false, vadOk: true, level: 0, vadTimer: 0, abort: null, turn: null, endReason: '' };
 const V = { q: [], cur: null };
 const STATUS = { idle: 'TARS', arming: 'Microphone', listening: 'Listening', sending: 'Sending', thinking: 'Thinking', speaking: 'TARS', error: 'TARS' };
 function setState(st, status) {
+  const was = T.st;
   T.st = st;
   const card = $('#tars');
   card.className = 'tars ' + (st === 'arming' || st === 'sending' ? (st === 'arming' ? 'listening' : 'thinking') : st) + ($('#action').hidden ? '' : ' has-action');
   $('#status').textContent = status || (st === 'idle' ? `TARS · humor ${cfg.humor}%` : STATUS[st]);
-  document.querySelectorAll('#quick button').forEach(b => { b.disabled = st !== 'idle' && st !== 'error'; });
+  document.querySelectorAll('#quick button[data-q]').forEach(b => { b.disabled = st !== 'idle' && st !== 'error'; });
   if ((st === 'idle' || st === 'error') && (T.ducked || T.pendingPlay)) musicAfterTurn();
+  if (was !== st && (st === 'idle' || st === 'error')) camSyncSoon();   // dash cam uploads held back while TARS was busy
 }
 function setReply(html, cls = '') { const r = $('#reply'); r.className = 'reply ' + cls; r.innerHTML = html; fitReply(); }
 function fitReply() {
@@ -862,6 +1745,7 @@ function onTarsTap(e) {
   if (T.st === 'arming') return;
   unlockAudio();
   if (!pcBase()) { notLinked(); return; }
+  T.tapAt = Date.now();                              // "save that" keeps the footage around this moment
   musicDuck();
   startListening();
 }
@@ -961,7 +1845,7 @@ function cancelTurn() {
 }
 function placesParam() { return places.slice(0, 30).map(p => `${String(p.name).replace(/[|~]/g, ' ')}~${p.kind || ''}`).join('|'); }
 async function sendTurn(req) {
-  const turn = { at: Date.now(), kind: req.audio ? 'voice' : 'quick', heard: req.label || '', reply: [], actions: [], error: '', mode: mode() };
+  const turn = { at: Date.now(), tapAt: T.tapAt || Date.now(), kind: req.audio ? 'voice' : 'quick', heard: req.label || '', reply: [], actions: [], error: '', mode: mode() };
   T.turn = turn;
   stopVoice(); clearAction();
   $('#said').textContent = req.audio ? '' : `“${req.label || req.text}”`;
@@ -971,7 +1855,7 @@ async function sendTurn(req) {
   let idleTimer = 0;
   const kick = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { turn.stalled = true; ctl.abort(); }, 30000); };
   kick();
-  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, places: placesParam(), v: VERSION };
+  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, places: placesParam(), v: VERSION, cam: camRecording() ? 1 : 0 };
   try {
     const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal, cache: 'no-store' };
     const res = req.audio
@@ -1018,6 +1902,7 @@ function onEvent(ev, turn) {
     case 'go': turn.actions.push({ t: 'go', place: ev.place }); showGo(ev.place); break;
     case 'play': turn.actions.push({ t: 'play', url: ev.url, name: ev.name }); rememberTars(ev); showPlay(ev); if (SP.connected) T.pendingPlay = { url: ev.url, name: ev.name }; break;
     case 'music': musicSoon(400); break;
+    case 'cam': if (ev.act === 'save') camSave('voice', turn.tapAt); break;
     case 'error':
       if (ev.code === 'silence' || ev.code === 'short') { turn.error = ev.msg; stopVoice(); setReply(esc(ev.msg) + ' Tap TARS and try again.', 'hint'); setState('idle'); }
       else { turn.error = ev.msg; showError(ev.msg, false); }
@@ -1130,6 +2015,7 @@ async function ask(text, label) {
   wakeOn(); unlockAudio();
   if (T.st !== 'idle' && T.st !== 'error') return;
   if (!pcBase()) { notLinked(); return; }
+  T.tapAt = Date.now();
   musicDuck();
   sendTurn({ text, label });
 }
@@ -1198,7 +2084,8 @@ function animate(t) {
 
 // ---------- home screen tiles ----------
 function renderQuick() {
-  $('#quick').innerHTML = quick.map((q, i) => `<button data-q="${i}">${esc(q.label)}</button>`).join('');
+  $('#quick').innerHTML = (camRecording() ? '<button class="camsave" data-camsave><i></i>Save clip</button>' : '')
+    + quick.map((q, i) => `<button data-q="${i}">${esc(q.label)}</button>`).join('');
   setState(T.st, T.st === 'idle' ? null : $('#status').textContent);
 }
 function tile(o) {
@@ -1223,6 +2110,7 @@ function renderTiles() {
   $('#musictiles').innerHTML = mt.join('');
 }
 document.addEventListener('click', e => {
+  if (e.target.closest('[data-camsave]')) { camSave('button'); return; }
   const q = e.target.closest('#quick button[data-q]');
   if (q) { const it = quick[+q.dataset.q]; if (it) ask(it.text, it.label); return; }
   const t = e.target.closest('.tile');
@@ -1250,6 +2138,7 @@ document.addEventListener('pointerdown', e => {
 }, { passive: true });
 function guard() { if (driving()) { toast('Park first. Menus are locked while you drive.'); return false; } return true; }
 $('#tars').addEventListener('click', onTarsTap);
+$('#camchip').addEventListener('click', camChipTap);
 $('#linkdot').addEventListener('click', () => { if (guard()) openSheet('settings'); });
 $('#wx').addEventListener('click', () => {
   const w = WX.now; if (!w) return;
@@ -1280,10 +2169,11 @@ function setupSteps() {
     { id: 'places', done: places.length > 0, title: 'Save your places', text: 'Home, work and gym, saved on this phone only.' },
     { id: 'link', done: !!(checks.pc && checks.pc.ok), title: 'Link TARS', text: 'Needs Tailscale on the PC and this phone. Then TARS hears you and answers out loud.' },
     { id: 'spotify', done: SP.connected, title: 'Link Spotify (optional)', text: 'Music pauses while TARS talks, and the play, pause and skip buttons work right here.' },
+    { id: 'cam', done: camCfg.on, title: 'Dash cam (optional)', text: 'Records the road while TARS Drive is open. Say “save that” to keep a moment; clips go to your PC.' },
   ];
 }
 function renderSetupBar() {
-  const s = setupSteps().filter(x => x.id !== 'spotify'), left = s.filter(x => !x.done).length, b = $('#setupbar');
+  const s = setupSteps().filter(x => x.id !== 'spotify' && x.id !== 'cam'), left = s.filter(x => !x.done).length, b = $('#setupbar');
   if (!left || store.get('setupHidden', false)) { if (!b.hidden) { b.hidden = true; fitSoon(); } return; }
   b.hidden = false; b.innerHTML = `Setup ${s.length - left}/${s.length} ›`;
 }
@@ -1292,14 +2182,14 @@ function renderSetupBar() {
 let sheetName = '', sheetArg = null;
 function openSheet(name, arg) {
   sheetName = name; sheetArg = arg || null;
-  $('#sheettitle').textContent = ({ places: 'Places', music: 'Music', history: 'History', settings: 'Settings', check: 'Check this phone', setup: 'Set up' })[name] || '';
+  $('#sheettitle').textContent = ({ places: 'Places', music: 'Music', history: 'History', settings: 'Settings', check: 'Check this phone', setup: 'Set up', cam: 'Dash cam' })[name] || '';
   renderSheet();
   $('#sheet').classList.add('on');
   $('#sheetbody').scrollTop = 0;
 }
-function closeSheet() { $('#sheet').classList.remove('on'); sheetName = ''; stopMicTest(); renderTiles(); renderQuick(); renderSetupBar(); }
+function closeSheet() { $('#sheet').classList.remove('on'); sheetName = ''; sheetArg = null; stopMicTest(); camAimOff(); camPlayerOff(); renderTiles(); renderQuick(); renderSetupBar(); }
 $('#sheetdone').addEventListener('click', closeSheet);
-function renderSheet() { const f = SHEETS[sheetName]; if (f) f($('#sheetbody')); }
+function renderSheet() { const f = SHEETS[sheetName], B = $('#sheetbody'); B.onclick = null; B.onchange = null; if (f) f(B); }
 const seg = (name, opts, val) => `<div class="seg" data-seg="${name}">${opts.map(([v, l]) => `<button data-v="${esc(v)}" class="${v === val ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>`;
 
 const SHEETS = {
@@ -1370,12 +2260,12 @@ const SHEETS = {
       if (!/open\.spotify\.com\/|^spotify:/.test(url)) { msg('That isn’t a Spotify link.'); return; }
       pinMusic(url, name || 'Playlist'); renderSheet();
     };
-    B.addEventListener('click', e => {
+    B.onclick = e => {
       const p = e.target.closest('[data-mplay]'), d = e.target.closest('[data-mdel]'), pin = e.target.closest('[data-mpin]');
       if (p) { const m = music.find(x => x.url === p.dataset.mplay) || fromTars.find(x => x.url === p.dataset.mplay); musicPlay(p.dataset.mplay, m && m.name); }
       if (d) { music = music.filter(m => m.id !== d.dataset.mdel); store.set('music', music); renderSheet(); }
       if (pin) { pinMusic(pin.dataset.mpin, pin.dataset.name); renderSheet(); }
-    }, { once: false });
+    };
   },
   history(B) {
     B.innerHTML = convos.length ? convos.map(h => `<div class="card hist"><div class="q">${h.kind === 'quick' ? 'Tapped' : 'You'}: ${esc(h.heard || '…')}</div>
@@ -1400,6 +2290,9 @@ const SHEETS = {
         <p class="note">Plays and pauses on whichever device Spotify is playing on, like your main iPhone in the car. Needs Premium.</p>
         ${seg('duck', [['1', 'Pause music while TARS talks'], ['0', 'Leave it playing']], cfg.duck ? '1' : '0')}
         <p class="note" id="spmsg"></p></div>
+      <div class="card"><h3>Dash cam</h3><p>Records the road whenever TARS Drive is open, with no picture on screen and no sound. Say “save that” or tap Save clip to keep a moment; it goes to your PC by itself.</p>
+        ${seg('cam', [['1', 'On'], ['0', 'Off']], camCfg.on ? '1' : '0')}
+        <div class="acts"><button class="btn small" id="scam">${icon('cam')} Clips, aim and settings</button></div></div>
       <div class="card"><h3>Humor setting</h3><p>TARS’s own dial. It’s told this with every question.</p>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><b style="font:300 34px var(--display)" id="shv">${cfg.humor}%</b></div>
         <input type="range" id="shum" min="0" max="100" step="5" value="${cfg.humor}"></div>
@@ -1456,6 +2349,7 @@ const SHEETS = {
       if (s.dataset.seg === 'duck') cfg.duck = b.dataset.v === '1';
       if (s.dataset.seg === 'theme') { cfg.theme = b.dataset.v; applyTheme(); }
       if (s.dataset.seg === 'fx') { cfg.fx = b.dataset.v === '1'; document.documentElement.classList.toggle('fx', cfg.fx); }
+      if (s.dataset.seg === 'cam') { if (b.dataset.v === '1') camTurnOn(); else camTurnOff(); }
       saveCfg();
     }));
     $('#squicksave', B).onclick = () => {
@@ -1466,13 +2360,14 @@ const SHEETS = {
     $('#squickreset', B).onclick = () => { quick = DEFAULT_QUICK; store.set('quick', quick); renderSheet(); };
     $('#stg', B).onchange = e => { cfg.tg = e.target.value.trim().replace(/^@/, ''); saveCfg(); };
     $('#ssetup', B).onclick = () => { store.set('setupHidden', false); openSheet('setup'); };
+    $('#scam', B).onclick = () => openSheet('cam');
     $('#sreset', B).onclick = () => modal('Reset TARS Drive?', 'Deletes places, playlists, history, checks and the PC address from this phone.', [{ label: 'Cancel' },
       { label: 'Reset', hot: true, run: () => { try { Object.keys(localStorage).filter(k => k.startsWith('drive.')).forEach(k => localStorage.removeItem(k)); } catch {} location.reload(); } }]);
   },
   setup(B) {
     const s = setupSteps();
     B.innerHTML = s.map((x, i) => `<div class="step${x.done ? ' done' : ''}"><div class="num">${x.done ? '✓' : i + 1}</div><div class="grow"><div class="t" style="font-weight:700">${esc(x.title)}</div>
-      <p class="note">${esc(x.text)}</p>${x.done ? '' : `<div class="acts"><button class="btn small hot" data-step="${x.id}">${{ install: 'How', check: 'Check now', places: 'Add places', link: 'Link', spotify: 'Set up' }[x.id]}</button></div>`}</div></div>`).join('')
+      <p class="note">${esc(x.text)}</p>${x.done ? '' : `<div class="acts"><button class="btn small hot" data-step="${x.id}">${{ install: 'How', check: 'Check now', places: 'Add places', link: 'Link', spotify: 'Set up', cam: 'Turn on' }[x.id]}</button></div>`}</div></div>`).join('')
       + `<div class="card" style="margin-top:14px"><h3>Hey Siri, TARS (optional, after the link works)</h3><p>Talk to TARS without touching the screen, from the lock screen too. In the Shortcuts app, make a new shortcut called <b>TARS</b>:</p>
         <ol class="how"><li><b>Dictate Text</b> (Stop Listening: After Pause)</li>
         <li><b>Get Contents of URL</b>: <span style="-webkit-user-select:all;user-select:all">${esc((pcBase() || 'https://pc-name.tailnet.ts.net/car') + '/say?format=mp3')}</span>, Method POST, Request Body JSON with <b>text</b> = Dictated Text and <b>mode</b> = driving</li>
@@ -1485,10 +2380,12 @@ const SHEETS = {
       if (id === 'check') openSheet('check');
       if (id === 'places') openSheet('places', { add: 'home' });
       if (id === 'link' || id === 'spotify') openSheet('settings');
+      if (id === 'cam') { camTurnOn(); setTimeout(renderSheet, 600); }
     });
     $('#shide', B).onclick = () => { store.set('setupHidden', true); closeSheet(); };
   },
   check(B) { renderChecks(B); },
+  cam(B) { camSheet(B); },
 };
 function spText() {
   if (!pcBase()) return 'Link TARS first; Spotify goes through the PC.';
@@ -1525,20 +2422,22 @@ const LINK_TESTS = [
 ];
 const pendingLink = { id: null, at: 0 };
 function renderChecks(B) {
-  const badge = id => { const c = checks[id]; return c ? `<span class="badge ${c.ok ? 'ok' : 'bad'}">${c.ok ? 'OK' : 'NO'}</span>` : '<span class="badge">—</span>'; };
+  const badge = id => { const c = checks[id]; return !c ? '<span class="badge">—</span>' : c.ok == null ? '<span class="badge">…</span>' : `<span class="badge ${c.ok ? 'ok' : 'bad'}">${c.ok ? 'OK' : 'NO'}</span>`; };
   const det = id => checks[id] && checks[id].detail ? `<div class="s">${esc(checks[id].detail)}</div>` : '';
   const row = (id, title, btn) => `<div class="row"><div class="grow"><div class="t">${esc(title)}</div>${det(id)}</div>${badge(id)}${btn ? `<button class="btn small" data-run="${id}">${btn}</button>` : ''}</div>`;
   B.innerHTML = `
     <div class="card"><h3>Sound and voice</h3><p>Turn the volume up. The speaker test plays TARS’s real voice.</p>
       ${row('speaker', 'Speaker', 'Play')}${row('mic', 'Microphone', 'Test')}<div class="meter" id="mmeter"><i></i></div>${row('speaker2', 'Speaker after the mic', 'Play')}</div>
     <div class="card"><h3>This phone</h3>${row('install', 'Running from the Home Screen', '')}${row('gps', 'Location and speed', 'Test')}${row('wake', 'Screen stays on', 'Test')}${row('storage', 'Storage kept', 'Test')}${row('pc', 'TARS link', pcBase() ? 'Test' : '')}</div>
+    <div class="card"><h3>Dash cam</h3><p>Point the back camera at something. The second test opens the microphone in the middle of a recording, the way tapping TARS does.</p>
+      ${row('cam', 'Back camera records', 'Test')}${row('cammic', 'Camera keeps going while TARS listens', 'Test')}${row('camstore', 'Room for footage', 'Test')}</div>
     <div class="card"><h3>Apps that open from here</h3><p>Each one opens a search for a petrol station. Come back with the ◀ TARS link in the corner, then say if it worked.</p>
       ${LINK_TESTS.map(([id, title]) => row(id, title, 'Open')).join('')}</div>
     <div class="acts"><button class="btn hot" id="cauto">Run the automatic ones</button><button class="btn" id="creport">Send the results to the PC</button><button class="btn" id="cshare">Share</button></div>
     <p class="note" id="cmsg"></p>`;
   if (!checks.install) setCheck('install', standalone(), standalone() ? '' : 'Open it from the Home Screen icon');
   B.querySelectorAll('[data-run]').forEach(b => b.onclick = () => runCheck(b.dataset.run));
-  $('#cauto', B).onclick = () => Promise.all(['gps', 'wake', 'storage', ...(pcBase() ? ['pc'] : [])].map(id => runCheck(id)));
+  $('#cauto', B).onclick = () => Promise.all(['gps', 'wake', 'storage', 'camstore', ...(pcBase() ? ['pc'] : [])].map(id => runCheck(id)));
   $('#creport', B).onclick = async () => {
     const m = $('#cmsg', B);
     if (!pcBase()) { m.textContent = 'Link TARS first (Settings).'; return; }
@@ -1551,7 +2450,8 @@ function renderChecks(B) {
 }
 function report() {
   return { app: VERSION, at: new Date().toISOString(), ua: navigator.userAgent, standalone: standalone(), screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
-    checks, maps: cfg.maps, links: { google: linkMethod('google'), waze: linkMethod('waze'), spotify: linkMethod('spotify') }, places: places.length, pinned: music.length, mime: pickAudioMime(), log: LOG.slice(-60) };
+    checks, maps: cfg.maps, links: { google: linkMethod('google'), waze: linkMethod('waze'), spotify: linkMethod('spotify') }, places: places.length, pinned: music.length, mime: pickAudioMime(), log: LOG.slice(-60),
+    cam: camReport(), camLog: CAM.log.slice(-60) };
 }
 async function runCheck(id) {
   const LT = LINK_TESTS.find(x => x[0] === id);
@@ -1569,6 +2469,7 @@ async function runCheck(id) {
     return;
   }
   if (id === 'mic') return micTest();
+  if (id === 'cam' || id === 'cammic' || id === 'camstore') return camCheck(id);
   if (id === 'gps') {
     const say = (acc, spd) => setCheck('gps', acc < 100, `±${Math.round(acc)} m, speed ${spd == null ? 'not reported (worked out from movement)' : 'reported'}`);
     if (fresh()) { say(G.fix.acc, G.fix.spd); return; }        // the live fix the app already has
@@ -1629,11 +2530,11 @@ function stopMicTest() { if (micT) { clearInterval(micT.timer); micT.stream.getT
 // ---------- life cycle ----------
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    gpsOn(); wakeOn(); tick(); linkLoop(); musicSoon(SP.waitLink ? 800 : 300);
+    gpsOn(); wakeOn(); tick(); linkLoop(); musicSoon(SP.waitLink ? 800 : 300); camVisible();
     if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
     if (pendingLink.id && Date.now() - pendingLink.at < 180000) setTimeout(askLink, 400);
   } else {
-    gpsOff();
+    gpsOff(); camHidden();
     if (T.st === 'listening') endListening('tap');
   }
 });
@@ -1653,6 +2554,7 @@ function demo(kind) {
     art: '', device: { name: 'Main iPhone' }, progress_ms: 151000, duration_ms: 351000 } });
   musicLoop = () => {}; renderNow();
   checks = { install: { ok: true }, speaker: { ok: true }, mic: { ok: true }, gps: { ok: true } };
+  CAM.demo = true; camCfg.on = true; CAM.started = Date.now() - (23 * 60 + 4) * 1000; camUi();
   if (kind === 'night') cfg.theme = 'night';
   renderTiles(); renderQuick(); renderWx(); renderSub(); renderSpeed(); renderLink(); applyTheme();
   $('#said').textContent = '“How long is the drive home right now?”';
@@ -1682,7 +2584,9 @@ function demo(kind) {
   requestAnimationFrame(animate);
   fitLayout();
   const d = /#demo(?:=(\w+))?/.exec(location.hash);
+  setInterval(camTick, 500);
   if (d) { demo(d[1] || 'idle'); return; }
+  camBoot();
   gpsOn(); linkLoop(); musicLoop();
   setInterval(() => { if (SP.connected && SP.now && SP.now.playing && document.visibilityState === 'visible') renderNow(); }, 1000);
   if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
