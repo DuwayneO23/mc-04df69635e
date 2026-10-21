@@ -431,7 +431,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -1395,7 +1395,8 @@ const SHEETS = {
           <li>Redirect URI, exactly: <b style="-webkit-user-select:all;user-select:all;word-break:break-all">${esc((pcBase() || 'https://<your-pc>.ts.net/car') + '/music/callback')}</b> <button class="btn small" id="spcopy">Copy</button></li>
           <li>Tick <b>Web API</b>, agree, Save. Copy the <b>Client ID</b> and paste it here.</li></ol>
           <input class="field" id="spcid" placeholder="Client ID (32 letters and digits)" autocomplete="off" autocapitalize="off" spellcheck="false">
-          <div class="acts"><button class="btn hot" id="spgo">Connect Spotify</button></div></div>
+          <div class="acts"><button class="btn${SP.configured ? '' : ' hot'}" id="spgo">${SP.configured ? 'Save a new Client ID' : 'Save Client ID'}</button>
+            <button class="btn hot" id="splogin" ${SP.configured ? '' : 'hidden'}>Sign in to Spotify ›</button></div></div>
         <p class="note">Plays and pauses on whichever device Spotify is playing on, like your main iPhone in the car. Needs Premium.</p>
         ${seg('duck', [['1', 'Pause music while TARS talks'], ['0', 'Leave it playing']], cfg.duck ? '1' : '0')}
         <p class="note" id="spmsg"></p></div>
@@ -1434,10 +1435,18 @@ const SHEETS = {
         const r = await fetch(`${pcBase()}/music/setup`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ client_id: cid, base: pcBase() }) });
         const j = await r.json();
         if (!r.ok) { spm(j.error || 'The PC said ' + r.status); return; }
-        spm('Opening Spotify… approve it, then come back here.');
-        SP.waitLink = Date.now(); musicSoon(2500);
-        openExternal(`${pcBase()}/music/login`);
+        SP.configured = true;
+        spm('Client ID saved. Now tap Sign in to Spotify.');
+        const lb = $('#splogin', B); if (lb) lb.hidden = false;
+        go.classList.remove('hot'); go.textContent = 'Save a new Client ID';
       } catch { spm('Couldn’t reach the PC.'); }
+    };
+    const login = $('#splogin', B);
+    if (login) login.onclick = () => {
+      // straight from the tap: iOS refuses to open Safari after a network wait
+      SP.waitLink = Date.now(); musicSoon(2500);
+      openExternal(`${pcBase()}/music/login`);
+      spm('Approve it in Spotify, then come back here.');
     };
     $('#shum', B).oninput = e => { cfg.humor = +e.target.value; $('#shv', B).textContent = cfg.humor + '%'; saveCfg(); if (T.st === 'idle') setState('idle'); };
     B.querySelectorAll('[data-seg]').forEach(s => s.addEventListener('click', e => {
@@ -1484,7 +1493,7 @@ const SHEETS = {
 function spText() {
   if (!pcBase()) return 'Link TARS first; Spotify goes through the PC.';
   if (SP.connected) return `Linked ✓${SP.now && SP.now.active ? ` · ${SP.now.track}${SP.now.device && SP.now.device.name ? ' on ' + SP.now.device.name : ''}` : ''}`;
-  return SP.configured ? 'Client ID saved; finish the Spotify sign-in.' : 'Not linked. Three steps, once:';
+  return SP.configured ? 'Client ID saved. Tap Sign in to Spotify to finish.' : 'Not linked. Three steps, once:';
 }
 function mapsNote() {
   if (cfg.maps === 'apple') return 'Apple Maps is built into the iPhone, so GO always opens it.';
