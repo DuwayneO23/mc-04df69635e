@@ -22,10 +22,11 @@
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
 }
+/* night: "Interstellar". Deep space blue-black, icy white, TARS's warm amber. Still dim enough not to glare in the car. */
 html[data-theme="night"] {
-  --bg: #000; --bg2: #050202; --card: #0d0606; --card2: #140909; --line: rgba(255,120,90,.10); --line2: rgba(255,120,90,.2);
-  --ink: #ffb8a3; --dim: #b0705e; --faint: #6e3e33; --amber: #ff7b45; --amber-ink: #170500; --ok: #d98a5b; --bad: #ff5a3c; --cool: #ffb8a3;
-  --metal-a: #2a1d1a; --metal-b: #120b0a; --face: #070303; --glow: rgba(255,110,60,.5);
+  --bg: #02040a; --bg2: #060a14; --card: #0a101c; --card2: #0f1727; --line: rgba(150,190,255,.085); --line2: rgba(150,190,255,.17);
+  --ink: #dbe5f4; --dim: #8796ae; --faint: #4b586d; --amber: #ffb547; --amber-ink: #1a1206; --ok: #6be3b5; --bad: #ff6b5b; --cool: #a9d8ff;
+  --metal-a: #222b3b; --metal-b: #0c111a; --face: #04070d; --glow: rgba(255,181,71,.5);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; touch-action: manipulation; }
@@ -78,7 +79,6 @@ svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-widt
   transform-origin: 50% 100%; transform: scaleY(var(--lv, .12)); opacity: calc(.25 + var(--lv, .12) * .75);
   box-shadow: 0 0 10px var(--glow); }
 .tars.speaking .slab i { background: var(--cool); box-shadow: 0 0 10px rgba(207,230,255,.55); }
-html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
 .face { position: absolute; left: 22%; right: 22%; top: 13%; height: 17%; min-height: 20px; border-radius: 3px; background: var(--face);
   border: 1px solid rgba(255,255,255,.09); display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 8%; overflow: hidden; }
 .face b { display: block; height: 2px; border-radius: 1px; background: var(--ink); opacity: .85; transition: width .4s; }
@@ -188,41 +188,161 @@ html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
   #app.c3 .speed b { font-size: 28px; }
 }
 
-/* landscape on a phone: clock | TARS | tiles */
+/* landscape on a phone, the way it sits in the car: an instrument column on the left (clock, date, the chips, speed),
+   TARS in the middle, GO and music on the right, quick asks and the menu along the bottom */
 @media (orientation: landscape) and (max-height: 520px) {
-  #app { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto;
-    column-gap: 14px; row-gap: 8px; padding-top: calc(env(safe-area-inset-top) + 6px); }
-  .top { grid-column: 1 / -1; grid-row: 1; min-height: 28px; }
-  .hero { grid-column: 1; grid-row: 2; align-self: center; }
-  .clock { font-size: clamp(58px, 10vw, 100px); }
-  .sub { font-size: 13px; }
-  .tars { grid-column: 2; grid-row: 2; min-height: 0; padding: 12px 12px 12px 14px; column-gap: 14px; }
-  .monolith, .tars.has-action .monolith { height: clamp(76px, 24vh, 120px); }
-  .reply { font-size: 18px; }
-  .said { font-size: 13px; }
+  #app { display: grid; grid-template-columns: minmax(0, .74fr) minmax(0, 1.5fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "hero tars groups" "status tars groups" "drive quick menu";
+    column-gap: 14px; row-gap: 8px;
+    padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 12px); }
+  .hero { grid-area: hero; container-type: inline-size; gap: 4px; min-width: 0; }
+  .clock { font-size: min(39cqw, 96px); margin-left: -2px; }
+  .sub { font-size: 12.5px; gap: 2px 10px; min-height: 0; }
+  .top { grid-area: status; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 6px; min-height: 0; overflow: hidden; }
+  .top .date { flex: 1 0 100%; order: -1; }
+  .tars { grid-area: tars; min-height: 0; padding: 14px 14px 14px 18px; column-gap: 16px; }
+  .monolith, .tars.has-action .monolith { height: clamp(90px, 30vh, 150px); }
+  .reply { font-size: 19px; }
+  .said { font-size: 13.5px; }
   .action { padding: 6px 6px 6px 12px; }
-  .action .go, .action .alt, .action .x { height: 44px; }
-  .quick { grid-column: 2; grid-row: 3; margin: 0; padding: 0; }
-  .quick button { height: 40px; font-size: 13px; padding: 0 13px; }
-  .groups { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 0; }
-  .group { gap: 4px; }
+  .action .go, .action .alt, .action .x { height: 46px; }
+  .quick { grid-area: quick; margin: 0; padding: 0; align-self: center; }
+  .quick button { height: 42px; font-size: 14px; padding: 0 14px; }
+  .groups { grid-area: groups; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+  .group { gap: 5px; }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  .tile, .tile.more { height: 46px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 0 10px; border-radius: 15px; text-align: left; }
-  .tile svg.i { width: 20px; height: 20px; }
+  .tile, .tile.more { height: 52px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 9px; padding: 0 11px; border-radius: 16px; text-align: left; }
+  .tile svg.i { width: 21px; height: 21px; }
   .tile .s { display: none; }
-  .tile .n, .tile.more .n { font-size: 13px; -webkit-line-clamp: 1; color: inherit; text-align: left; font-weight: 700; }
+  .tile .n, .tile.more .n { font-size: 14px; -webkit-line-clamp: 1; color: inherit; text-align: left; font-weight: 700; }
   .bottom { display: contents; }
-  .drive { grid-column: 1; grid-row: 3; }
-  .menu { grid-column: 3; grid-row: 3; justify-content: flex-end; gap: 8px; }
-  .iconbtn { width: 40px; height: 40px; border-radius: 13px; }
-  .speed b { font-size: 26px; }
-  .np { padding: 5px; gap: 8px; }
-  .np .art { width: 36px; height: 36px; border-radius: 8px; }
-  .np .npb { width: 38px; height: 38px; border-radius: 11px; }
-  .np .npb.big { width: 42px; }
-  .np .meta .t { font-size: 13px; } .np .meta .s { font-size: 11px; }
+  .drive { grid-area: drive; }
+  .menu { grid-area: menu; justify-content: flex-end; gap: 8px; }
+  .iconbtn { width: 42px; height: 42px; border-radius: 14px; }
+  #modebtn span { display: none; }
+  #modebtn { padding: 0; width: 42px; justify-content: center; }
+  .speed b { font-size: 30px; }
+  .np { padding: 6px; gap: 8px; }
+  .np .art, .np .art.none { display: none; }
+  .np .meta { padding-left: 6px; }
+  .np .npb { width: 40px; height: 40px; border-radius: 12px; }
+  .np .npb.big { width: 46px; }
+  .np .meta .t { font-size: 13.5px; } .np .meta .s { font-size: 11.5px; }
+  #app.l1 .group .label { display: none; }
+  #app.l1 .tile, #app.l1 .tile.more { height: 46px; }
+  #app.l2 .tile, #app.l2 .tile.more { height: 40px; border-radius: 13px; }
+  #app.l2 .np .art { width: 34px; height: 34px; }
+  #app.l2 .np .npb { width: 36px; height: 36px; }
 }
 @media (orientation: portrait), (min-height: 521px) { .groups { display: contents; } }
+
+/* ---------- Home mode (html.home): the phone on its stand at home ---------- */
+#hole, #wxcard, #carcard, #modebtn { display: none; }
+#hole { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; background: #000; }
+#hole.flat { background: radial-gradient(circle at 50% 40%, #000 0 14%, #fff3dc 14.6%, #ffb547 16%, rgba(255,140,40,.32) 22%, transparent 36%),
+  linear-gradient(transparent 38.6%, rgba(255,190,90,.6) 39.6%, rgba(255,190,90,.6) 40.4%, transparent 41.6%), #02040a; }
+#modebtn { width: auto; padding: 0 14px; gap: 8px; font-weight: 700; font-size: 14px; color: var(--ink); }
+#modebtn svg.i { width: 20px; height: 20px; color: var(--amber); }
+#app.stopped #modebtn { display: inline-flex; align-items: center; }
+#app.stopped .drive .speed { display: none; }
+html.home #modebtn { display: inline-flex; align-items: center; }
+html.home .drive .speed, html.home #mode, html.home .camchip, html.home #wx, html.home .sub { display: none !important; }
+html.home .monolith { display: none; }
+html.home #hole { display: block; }
+html.home .tars { display: flex; flex-direction: column; justify-content: flex-end; padding: 0; background: #000; border-color: rgba(150,190,255,.12); min-height: 220px; }
+html.home .tars::before { display: none; }
+html.fx.home .tars { -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: 0 30px 80px -40px rgba(255,150,60,.35); }
+html.home .readout { z-index: 1; flex: none; align-self: stretch; align-items: center; text-align: center; gap: 6px; max-height: 52%;
+  padding: 30px 20px 16px; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.7) 30%, rgba(0,0,0,.86)); }
+html.home .status { justify-content: center; color: #9fb0c8; }
+html.home .said { color: #9fb0c8; }
+html.home .reply { color: #eef3fb; font-size: clamp(18px, 4.4vw, 22px); }
+html.home .reply.hint { color: #9fb0c8; }
+html.home .action { z-index: 1; margin: 0 12px 12px; }
+html.home .groups > .group:first-child, html.home #musictiles, html.home .groups .label { display: none; }
+html.home .orb { animation-play-state: paused; }
+html.home #wxcard, html.home #carcard { display: block; }
+.hcard { min-width: 0; min-height: 0; overflow: hidden; padding: 12px 14px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); }
+html.fx .hcard { background: color-mix(in srgb, var(--card) 76%, transparent); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.hcard .hk { display: flex; align-items: center; gap: 7px; color: var(--faint); margin-bottom: 6px; }
+.hcard .hk svg.i { width: 15px; height: 15px; color: var(--amber); }
+.hcard .hk .volt, .hcard .hk .hm { margin-left: auto; color: var(--dim); letter-spacing: .06em; }
+.hcard .hk .volt.low { color: var(--bad); }
+.hcard .hnone { color: var(--dim); font-size: 14px; }
+.wxnow { display: flex; align-items: center; gap: 12px; }
+.wxnow b { font: 250 44px/1 var(--display); letter-spacing: -.03em; }
+.wxnow .t { font-weight: 650; font-size: 15px; }
+.wxnow .s { color: var(--dim); font-size: 12.5px; }
+.hrain { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--cool); font-size: 13px; font-weight: 600; }
+.hrain svg.i { width: 16px; height: 16px; }
+.hours { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; margin-top: 10px; text-align: center; font-size: 12px; }
+.hours div { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.hours span { color: var(--dim); font: 600 10.5px var(--mono); }
+.hours svg.i { width: 18px; height: 18px; color: var(--ink); opacity: .85; }
+.hours b { font-weight: 650; }
+.hours i { font-style: normal; font-size: 10.5px; color: var(--dim); min-height: 13px; }
+.hours i.wet { color: var(--cool); }
+.hsun { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--dim); }
+.hsun svg.i { width: 15px; height: 15px; color: var(--amber); }
+.hsun span { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+.hsun .hm { margin-left: auto; }
+.hmoon { color: var(--faint); font-size: 12px; margin-top: 3px; }
+.hstate { font-size: 15px; margin-bottom: 6px; }
+.hstate b { font-weight: 700; }
+.hrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13.5px; padding: 5px 0 0; width: 100%; text-align: left; }
+.hrow .hl { color: var(--dim); font-size: 12px; flex: none; }
+.hrow span:last-child { text-align: right; min-width: 0; }
+.hsub { text-align: right; color: var(--dim); font-size: 12.5px; }
+.hclip span:last-child { color: var(--amber); }
+.hodo { color: var(--faint); margin-top: 8px; text-align: right; }
+/* Home mode, portrait: the stage in the middle, weather and the car side by side under it */
+@media (orientation: portrait) {
+  html.home #app { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 10px; row-gap: 10px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto;
+    grid-template-areas: "status status" "hero hero" "tars tars" "quick quick" "wx car" "music music" "drive menu"; }
+  html.home .top { grid-area: status; }
+  html.home .hero { grid-area: hero; }
+  html.home .clock { font-size: clamp(56px, 18vw, 84px); }
+  html.home .tars { grid-area: tars; }
+  html.home .quick { grid-area: quick; }
+  html.home #wxcard { grid-area: wx; }
+  html.home #carcard { grid-area: car; }
+  html.home .groups { display: contents; }
+  html.home .groups > .group:last-child { grid-area: music; }
+  html.home .bottom { display: contents; }
+  html.home .drive { grid-area: drive; }
+  html.home .menu { grid-area: menu; justify-content: flex-end; }
+  html.home .hours { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html.home .hours div:nth-child(n+5) { display: none; }
+  html.home .hsun .hm { display: none; }
+  html.home #app.h1 .hmoon, html.home #app.h1 .hodo { display: none; }
+  html.home #app.h2 .hours, html.home #app.h2 .hsub { display: none; }
+  html.home #app.h3 .groups > .group:last-child { display: none; }
+}
+/* Home mode, landscape on a stand: clock and weather | Gargantua | the car and music */
+@media (orientation: landscape) and (max-height: 520px) {
+  html.home #app { grid-template-columns: minmax(0, .92fr) minmax(0, 1.42fr) minmax(0, .92fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "status tars car" "hero tars car" "wx tars car" "wx tars music" "drive quick menu"; }
+  html.home .clock { font-size: min(36cqw, 92px); }
+  html.home .groups { display: contents; }
+  html.home #wxcard { grid-area: wx; }
+  html.home #carcard { grid-area: car; }
+  html.home .groups > .group:last-child { grid-area: music; }
+  html.home .np { flex-wrap: wrap; justify-content: center; row-gap: 4px; }
+  html.home .np .meta { flex: 1 0 100%; text-align: center; padding: 2px 4px 0; }
+  html.home .hodo, html.home .hmoon, html.home .hsun .hm, html.home .setupbar { display: none; }
+  html.home .top .date { flex: 1 1 auto; }
+  html.home .wxnow b { font-size: 38px; }
+  html.home .hcard { padding: 10px 12px; }
+}
+/* night at home: after three quiet minutes everything but the clock and the black hole fades right down */
+html.home .top, html.home .quick, html.home #wxcard, html.home #carcard, html.home .groups > .group, html.home .menu, html.home .drive,
+html.home .hero, html.home .readout { transition: opacity 1.4s ease; }
+html.ambient.home .top, html.ambient.home .quick, html.ambient.home #wxcard, html.ambient.home #carcard,
+html.ambient.home .groups > .group, html.ambient.home .menu, html.ambient.home .drive { opacity: .1; }
+html.ambient.home .hero { opacity: .55; }
+html.ambient.home .readout { opacity: 0; }
 
 /* ---------- effects: Settings → Look → Effects (html.fx). Slow and quiet, made for the car. ---------- */
 :root { --sky-a: rgba(255,181,71,.13); --sky-b: rgba(70,130,255,.10); --star-o: 0; }
@@ -230,7 +350,7 @@ html[data-sky="dawn"] { --sky-a: rgba(255,150,90,.18); --sky-b: rgba(150,110,255
 html[data-sky="golden"] { --sky-a: rgba(255,138,50,.24); --sky-b: rgba(255,80,96,.12); --star-o: .12; }
 html[data-sky="night"] { --sky-a: rgba(255,110,60,.11); --sky-b: rgba(46,74,170,.13); --star-o: .75; }
 html[data-wet] { --sky-b: rgba(90,165,230,.19); }
-html[data-theme="night"] { --sky-a: rgba(255,90,50,.10); --sky-b: rgba(120,30,30,.12); }
+html[data-theme="night"] { --sky-a: rgba(255,160,70,.10); --sky-b: rgba(55,100,255,.18); }
 #sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; display: none; }
 html.fx #sky { display: block; }
 #app { z-index: 1; }
@@ -243,7 +363,7 @@ html.fx #sky { display: block; }
 #stars i { position: absolute; border-radius: 50%; background: #fff; }
 #stars i.tw { animation: twinkle 9s ease-in-out infinite; }
 @keyframes twinkle { 0%, 100% { opacity: .75; } 50% { opacity: .12; } }
-html[data-theme="night"] #stars i { background: #ffc2ae; }
+html[data-theme="night"] #stars i { background: #e2ecff; }
 html.fx .tile, html.fx .np, html.fx .chip, html.fx .quick button, html.fx .iconbtn, html.fx #linkdot {
   background: color-mix(in srgb, var(--card) 74%, transparent); box-shadow: inset 0 1px 0 rgba(255,255,255,.055); }
 html.fx .tile.ghost { background: transparent; box-shadow: none; }
@@ -368,7 +488,7 @@ ol.how b { color: var(--ink); }
 #toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 84px); transform: translate(-50%, 20px); z-index: 30; max-width: 88vw; padding: 12px 18px; border-radius: 16px;
   background: rgba(20,22,26,.94); border: 1px solid var(--line2); font-weight: 600; font-size: 15px; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
+html[data-theme="night"] #toast { background: rgba(6,10,20,.94); }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
 #modal { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 24px; }
 #modal .box { width: min(420px, 100%); background: var(--card); border: 1px solid var(--line2); border-radius: 24px; padding: 20px; }
@@ -406,6 +526,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M5.5 5.5 15 12l-9.5 6.5Z"/></symbol>
   <symbol id="i-playf" viewBox="0 0 24 24"><path d="M7 4.8v14.4L19 12Z" fill="currentColor"/></symbol>
   <symbol id="i-pausef" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></symbol>
+  <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 15.5v-4l1.9-4.6A2 2 0 0 1 8.8 5.6h6.4a2 2 0 0 1 1.9 1.3L19 11.5v4"/><path d="M3.8 11.5h16.4M4.5 15.5h15v2.2a.8.8 0 0 1-.8.8h-1.9a.8.8 0 0 1-.8-.8v-1.2H8v1.2a.8.8 0 0 1-.8.8H5.3a.8.8 0 0 1-.8-.8Z"/><circle cx="7.6" cy="13.4" r=".7"/><circle cx="16.4" cy="13.4" r=".7"/></symbol>
   <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="m16 10.5 5-3v9l-5-3"/></symbol>
 </svg>
 
@@ -425,6 +546,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
   </section>
 
   <section class="tars" id="tars" aria-label="Talk to TARS">
+    <canvas id="hole" aria-hidden="true"></canvas>
     <div class="monolith" id="monolith" aria-hidden="true">
       <span class="slab"><i></i></span><span class="slab"><i></i></span><span class="slab"><i></i></span><span class="slab"><i></i></span>
       <span class="face"><b></b><b></b></span>
@@ -438,9 +560,11 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
   </section>
 
   <nav class="quick" id="quick" aria-label="Quick asks"></nav>
+  <section class="hcard" id="wxcard" aria-label="Weather and the day"></section>
 
   <div class="groups">
     <section class="group"><div class="label mono">Go <span id="mapsname"></span></div><div class="tiles" id="gotiles"></div></section>
+    <section class="hcard" id="carcard" aria-label="Your car"></section>
     <section class="group"><div class="label mono">Music <span id="npdev"></span></div>
       <div class="np" id="np" hidden><div class="art none" id="npartbox"><svg class="i"><use href="#i-note"/></svg></div><div class="meta"><div class="t" id="nptitle"></div><div class="s" id="npsub"></div></div>
         <button class="npb" data-np="previous" aria-label="Previous"><svg class="i"><use href="#i-prev"/></svg></button>
@@ -450,7 +574,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
   </div>
 
   <div class="bottom">
-    <div class="drive"><div class="speed"><b id="spd">–</b><span>km/h</span></div><button id="mode" class="mono">No GPS</button></div>
+    <div class="drive"><button class="iconbtn" id="modebtn" aria-label="Home mode"></button><div class="speed"><b id="spd">–</b><span>km/h</span></div><button id="mode" class="mono">No GPS</button></div>
     <div class="menu">
       <button class="iconbtn" data-open="history" aria-label="History"><svg class="i"><use href="#i-hist"/></svg></button>
       <button class="iconbtn" data-open="check" aria-label="Check this phone"><svg class="i"><use href="#i-check"/></svg></button>
@@ -473,7 +597,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -490,7 +614,7 @@ window.addEventListener('error', e => log('JS error: ' + e.message));
 window.addEventListener('unhandledrejection', e => log('JS rejection: ' + (e.reason && e.reason.message || e.reason)));
 
 // ---------- settings and saved things ----------
-const DEFAULT_CFG = { humor: 75, voice: true, duck: true, fx: true, maps: 'google', theme: 'auto', tg: '' };
+const DEFAULT_CFG = { humor: 75, voice: true, duck: true, fx: true, maps: 'google', theme: 'auto', tg: '', autoHome: true };
 const DEFAULT_QUICK = [
   { label: 'Drive home?', text: 'How long is the drive home right now?' },
   { label: "Who's waiting?", text: "Who's waiting on me on WhatsApp?" },
@@ -535,7 +659,7 @@ function applyTheme() {
   const night = cfg.theme === 'night' || (cfg.theme === 'auto' && s && s.night);
   const want = night ? 'night' : 'day';
   if (document.documentElement.dataset.theme !== want) document.documentElement.dataset.theme = want;
-  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = night ? '#000000' : '#07080a';
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = night ? '#02040a' : '#07080a';
   skyPhase();
 }
 function skyPhase() {
@@ -575,7 +699,7 @@ function tick() {
     renderSub(); applyTheme();
   }
   renderSpeed();
-  camOfferTick();
+  camOfferTick(); modeTick(); ambientTick();
 }
 function dur(ms) { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${two(m % 60)}`; }
 function renderSub() {
@@ -624,6 +748,7 @@ function onFix(p) {
 }
 const fresh = () => G.fix && Date.now() - G.fix.t < 8000;
 function mode() {                                    // what TARS is told: unknown counts as driving (short replies)
+  if (appMode() === 'home') return 'home';
   if (fresh()) return G.moving ? 'driving' : 'parked';
   return G.manual || 'driving';
 }
@@ -634,6 +759,11 @@ function renderSpeed() {
   const m = $('#mode');
   if (fresh()) { m.textContent = G.moving ? 'Driving' : 'Parked'; m.className = 'mono' + (G.moving ? ' driving' : ''); }
   else { m.textContent = G.manual ? (G.manual === 'parked' ? 'Parked' : 'Driving') + ' *' : (G.denied ? 'GPS off' : 'No GPS'); m.className = 'mono' + (G.manual === 'driving' ? ' driving' : ''); }
+  // stopped (or at home): the speed gives way to the Home / Drive switch
+  const home = appMode() === 'home';
+  $('#app').classList.toggle('stopped', home || !driving());
+  const b = $('#modebtn'), key = home ? 'h' : 'd';
+  if (b.dataset.k !== key) { b.dataset.k = key; b.innerHTML = `${icon(home ? 'car' : 'home')}<span>${home ? 'Drive' : 'Home'}</span>`; b.setAttribute('aria-label', home ? 'Drive mode' : 'Home mode'); }
 }
 
 // ---------- weather (Open-Meteo, no key; the location is rounded to ~1 km) ----------
@@ -645,7 +775,9 @@ async function weather() {
   if (wxBusy || !area || !navigator.onLine) return;
   wxBusy = true;
   try {
-    const q = `latitude=${area.lat}&longitude=${area.lon}&timezone=auto&current=temperature_2m,weather_code,is_day,precipitation&minutely_15=precipitation&forecast_minutely_15=8&hourly=precipitation_probability&forecast_hours=3`;
+    const q = `latitude=${area.lat}&longitude=${area.lon}&timezone=auto&current=temperature_2m,weather_code,is_day,precipitation,apparent_temperature,wind_speed_10m,relative_humidity_2m`
+      + '&minutely_15=precipitation&forecast_minutely_15=8&hourly=precipitation_probability,temperature_2m,weather_code&forecast_hours=12'
+      + '&daily=temperature_2m_max,temperature_2m_min,uv_index_max&forecast_days=1';
     const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
     const r = await fetch('https://api.open-meteo.com/v1/forecast?' + q, { signal: ctl.signal });
     clearTimeout(tm);
@@ -655,11 +787,15 @@ async function weather() {
       const i = d.minutely_15.precipitation.findIndex(p => p >= 0.2);
       if (i >= 0) rainAt = d.minutely_15.time[i].slice(11, 16);
     }
-    if (!rainAt && d.hourly) { const i = d.hourly.precipitation_probability.findIndex(p => p >= 60); if (i >= 0) rainAt = d.hourly.time[i].slice(11, 16); }
-    WX.now = { temp: Math.round(c.temperature_2m), code: c.weather_code, day: c.is_day, rainAt };
+    if (!rainAt && d.hourly) { const i = d.hourly.precipitation_probability.slice(0, 3).findIndex(p => p >= 60); if (i >= 0) rainAt = d.hourly.time[i].slice(11, 16); }
+    const rnd = v => v == null ? null : Math.round(v);
+    WX.now = { temp: Math.round(c.temperature_2m), code: c.weather_code, day: c.is_day, rainAt, feels: rnd(c.apparent_temperature), wind: rnd(c.wind_speed_10m), hum: rnd(c.relative_humidity_2m) };
+    const hr = d.hourly || {};
+    WX.hours = (hr.time || []).map((t, i) => ({ t: new Date(t).getTime(), temp: rnd(hr.temperature_2m && hr.temperature_2m[i]), pp: (hr.precipitation_probability || [])[i] || 0, code: (hr.weather_code || [])[i] }));
+    WX.day = d.daily ? { max: rnd(d.daily.temperature_2m_max[0]), min: rnd(d.daily.temperature_2m_min[0]), uv: d.daily.uv_index_max ? rnd(d.daily.uv_index_max[0]) : null } : null;
     WX.at = Date.now(); store.set('wx', WX);
   } catch (e) { log('weather: ' + e.message); }
-  finally { wxBusy = false; renderWx(); renderSub(); skyPhase(); }
+  finally { wxBusy = false; renderWx(); renderSub(); skyPhase(); renderWxCard(); }
 }
 function renderWx() {
   const w = WX.now, b = $('#wx');
@@ -1011,7 +1147,7 @@ async function camPrune(cap) {
 
 // on and off. camCfg.on is his switch: while it's on, the dash cam records whenever TARS Drive is on screen.
 async function camStart(fromTap) {
-  if (CAM.on || CAM.starting || CAM.demo) return;
+  if (CAM.on || CAM.starting || CAM.demo || appMode() !== 'drive') return;
   CAM.starting = true; CAM.err = ''; camUi();
   try {
     const motion = fromTap ? camAskMotion() : null;   // iOS only asks for motion inside a tap
@@ -1066,7 +1202,7 @@ function camHidden() {
 }
 async function camVisible() {
   camSyncSoon();
-  if (!camCfg.on || CAM.demo) return;
+  if (!camCfg.on || CAM.demo || appMode() !== 'drive') return;
   if (!CAM.on) { if (!CAM.starting) camStart(false); return; }
   if (CAM.hiddenAt) camLog(`app visible again after ${((Date.now() - CAM.hiddenAt) / 1000).toFixed(1)} s`);
   if (!camTrack()) await camReopen('back on screen');
@@ -1300,8 +1436,9 @@ function camGps(c) {                                 // the track that goes to t
 }
 
 // the REC light, Save clip, the flash
-const camRecording = () => CAM.demo || (CAM.on && !!camTrack() && document.visibilityState === 'visible');
+const camRecording = () => appMode() === 'drive' && (CAM.demo || (CAM.on && !!camTrack() && document.visibilityState === 'visible'));
 function camState() {
+  if (appMode() !== 'drive') return 'off';
   if (CAM.demo) return 'rec';
   if (!camCfg.on) return 'off';
   if (CAM.starting) return 'starting';
@@ -1340,7 +1477,7 @@ function camChipTap() {
 function camFlash() { const f = $('#camflash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on'))); }
 function camOfferTick() {
   // The dash cam is new in TARS Drive: offer it once, where GO and PLAY appear (✕ is "not now"; Settings has it too)
-  if (CAM.offered || CAM.demo || camCfg.on || store.get('camOffered', 0) || !pcBase() || performance.now() < 3000) return;
+  if (CAM.offered || CAM.demo || camCfg.on || appMode() !== 'drive' || store.get('camOffered', 0) || !pcBase() || performance.now() < 3000) return;
   if (driving() || T.st !== 'idle' || sheetName || !$('#action').hidden || !$('#modal').hidden || document.visibilityState !== 'visible') return;
   CAM.offered = true; store.set('camOffered', 1);
   showAction({ title: 'Dash cam, built in', sub: 'Records the road while TARS Drive is open', button: 'TURN ON', run: camTurnOn });
@@ -1681,6 +1818,268 @@ function camBoot() {
   window.addEventListener('pagehide', camHidden);
 }
 
+// ---------- Home mode: the phone on its stand at home ----------
+// The same TARS, the same turn engine, a different screen: Gargantua in the middle (tap it and talk), the weather and the
+// day on one side, the car on the other, and TARS answering like he's in the room rather than in the car. It switches on
+// by itself at the saved Home spot and back to Drive the moment the car moves; the dash cam never runs in Home mode.
+const MODE = { cur: store.get('appMode', 'drive') === 'home' ? 'home' : 'drive', at: null, since: 0, first: true, fast: 0, touched: performance.now() };
+const appMode = () => MODE.cur;
+const DEFAULT_QUICK_HOME = [
+  { label: 'Brief me', text: 'Brief me.' },
+  { label: "Who's waiting?", text: "Who's waiting on me on WhatsApp?" },
+  { label: "What's on today?", text: "What's on my plate today?" },
+  { label: 'My last drive', text: 'How was my last drive?' },
+  { label: 'DJ me', text: 'Make me a Spotify playlist for right now, from my taste and the time of day.' },
+  { label: 'This week', text: "What's the weather doing this week?" },
+];
+let quickHome = store.get('quickHome', DEFAULT_QUICK_HOME);
+const quickList = () => appMode() === 'home' ? quickHome : quick;
+
+function setAppMode(m, why) {
+  if (m !== 'home' && m !== 'drive') return;
+  const changed = m !== MODE.cur;
+  MODE.cur = m; if (!CAM.demo) store.set('appMode', m);
+  document.documentElement.classList.toggle('home', m === 'home');
+  if (!changed && why !== 'boot') return;
+  if (changed) log(`${m} mode (${why})`);
+  if (m === 'home') { camStop('home mode'); holeStart(); homeLoop(); renderWxCard(); renderCarCard(); }
+  else { holeStop(); document.documentElement.classList.remove('ambient'); if (camCfg.on && document.visibilityState === 'visible' && why !== 'boot') camStart(false); }
+  if (changed) {
+    clearAction();
+    if (T.st === 'idle') setReply(m === 'home' ? 'Tap the black hole and talk.' : 'Tap TARS and talk.', 'hint');
+    if (why !== 'boot') toast(m === 'home' ? 'Home mode' : 'Drive mode');
+  }
+  renderQuick(); renderSpeed(); renderSub(); camUi(); fitSoon();
+}
+// The saved Home spot (Places: Home, "Use where I am"). An address alone can't be compared with GPS.
+const homeSpot = () => places.find(p => p.kind === 'home' && p.lat != null) || null;
+function atHomeNow() {
+  const h = homeSpot();
+  if (!h || !G.fix || Date.now() - G.fix.t > 120000 || G.fix.acc > 500) return null;
+  return dist(G.fix, h) <= 120 + Math.min(G.fix.acc, 150);
+}
+function modeTick() {
+  if (CAM.demo) return;
+  // Moving at all quickly means the car: Drive mode straight away, so the dash cam catches the start of the trip.
+  const f = G.fix, quickNow = f && Date.now() - f.t < 8000 && (f.spd || 0) * 3.6 >= 8;
+  MODE.fast = quickNow ? MODE.fast + (f.t !== MODE.fastT ? 1 : 0) : 0; if (f) MODE.fastT = f.t;
+  if (driving() || MODE.fast >= 2) {
+    if (MODE.cur === 'home') setAppMode('drive', 'driving');
+    MODE.at = false; MODE.since = 0; MODE.first = false;
+    return;
+  }
+  if (cfg.autoHome === false) return;
+  const at = atHomeNow();
+  if (at === null) return;
+  if (at && MODE.at !== true) {                      // arrived home (or opened the app there)
+    MODE.since = MODE.since || Date.now();
+    if (MODE.first || Date.now() - MODE.since > 5000) { MODE.at = true; MODE.since = 0; MODE.first = false; if (MODE.cur !== 'home') setAppMode('home', 'at home'); }
+  } else if (!at && MODE.at !== false) {             // away from home: back to Drive (after a manual Home away, only once he drives)
+    if (MODE.cur === 'home' && (MODE.at === true || MODE.first)) setAppMode('drive', MODE.first ? 'not at home' : 'left home');
+    MODE.at = false; MODE.since = 0; MODE.first = false;
+  } else if (at) MODE.since = 0;
+}
+function modeTap() {
+  if (appMode() === 'drive' && driving()) { toast('Home mode waits until you’re parked.'); return; }
+  setAppMode(appMode() === 'home' ? 'drive' : 'home', 'by hand');
+}
+// Night at home: after three quiet minutes the screen dims to the clock and a faint black hole. A touch wakes it.
+function ambientTick() {
+  const want = appMode() === 'home' && document.documentElement.dataset.theme === 'night' && T.st === 'idle' && !sheetName
+    && $('#modal').hidden && performance.now() - MODE.touched > 180000;
+  document.documentElement.classList.toggle('ambient', want);
+}
+document.addEventListener('pointerdown', () => { MODE.touched = performance.now(); document.documentElement.classList.remove('ambient'); }, { passive: true, capture: true });
+
+// The car and today's clips, from the PC (car_home.py): every minute while Home mode is on screen
+const HOMED = { at: 0, data: null, err: '', timer: 0, busy: false };
+async function homeFetch() {
+  if (!pcBase() || HOMED.busy) { renderCarCard(); return; }
+  HOMED.busy = true;
+  try {
+    const r = await fetch(`${pcBase()}/home`, { cache: 'no-store' });
+    if (r.status === 404) HOMED.err = 'the PC needs the Home mode update';
+    else if (!r.ok) HOMED.err = 'the PC said ' + r.status;
+    else { HOMED.data = await r.json(); HOMED.at = Date.now(); HOMED.err = ''; }
+  } catch { HOMED.err = 'can’t reach the PC'; }
+  finally { HOMED.busy = false; renderCarCard(); }
+}
+function homeLoop() {
+  clearTimeout(HOMED.timer);
+  if (appMode() === 'home' && document.visibilityState === 'visible' && !CAM.demo) homeFetch();
+  HOMED.timer = setTimeout(homeLoop, 60000);
+}
+const tOf = iso => { const d = new Date(iso); return isNaN(d) ? '' : (new Date().toDateString() === d.toDateString() ? '' : camDay(d.getTime()) + ' ') + hm(d); };
+function agoText(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  return !isFinite(s) ? '' : s < 90 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`;
+}
+function renderCarCard() {
+  const el = $('#carcard'); if (!el) return;
+  const c = HOMED.data && HOMED.data.car, k = HOMED.data && HOMED.data.clips;
+  const unsent = CAM.saves.filter(v => !v.done && new Date(v.id).toDateString() === new Date().toDateString()).length;
+  const head = `<div class="hk mono">${icon('car')}Your car${c && c.battery ? `<span class="volt${c.battery < 12.1 ? ' low' : ''}">${c.battery.toFixed(1)} V</span>` : ''}</div>`;
+  if (!c) { el.innerHTML = head + `<div class="hnone">${!pcBase() ? 'Link TARS to see the car.' : HOMED.err ? esc(HOMED.err[0].toUpperCase() + HOMED.err.slice(1)) + '.' : HOMED.busy || !HOMED.at ? 'Checking…' : 'No car data on the PC.'}</div>`; return; }
+  const state = c.state === 'parked' ? `<b>Parked</b>${c.where ? ' at ' + esc(c.where) : ''}${c.since ? ` · since ${tOf(c.since)}` : ''}`
+    : c.state === 'driving' ? `<b>On the move</b>${c.since ? ` since ${tOf(c.since)}` : ''}` : `Last heard from ${agoText(c.seen)}`;
+  const l = c.last;
+  const last = l ? `<div class="hrow"><span class="hl">Last drive</span><span>${tOf(l.start)} → ${hm(new Date(l.end))}</span></div>
+      ${l.from || l.to ? `<div class="hsub">${esc(l.from || '…')} → ${esc(l.to || '…')}</div>` : ''}
+      <div class="hsub">${l.km != null ? `${l.km} km · ` : ''}${l.min} min${l.max ? ` · top ${l.max}` : ''}</div>` : '';
+  const td = c.today && c.today.drives ? `<div class="hrow"><span class="hl">Today</span><span>${c.today.drives} drive${c.today.drives === 1 ? '' : 's'} · ${c.today.km} km</span></div>` : '';
+  const clips = k ? `<button class="hrow hclip" data-open="cam"><span class="hl">Clips today</span><span>${k.today ? `${k.today} · last ${esc(k.last ? k.last.t.slice(0, 5) : '')}` : 'None'}${unsent ? ` · ${unsent} to send` : ''}</span></button>` : '';
+  el.innerHTML = head + `<div class="hstate">${state}</div>${last}${td}${clips}${c.odometer ? `<div class="hodo mono">${c.odometer.toLocaleString('en-ZA')} km</div>` : ''}`;
+}
+// Weather and the day: Open-Meteo's answer (weather()), the sun from the phone's own maths, the moon from the date
+function moonPhase(d) {
+  const syn = 29.530588853, f = (((d.getTime() - Date.UTC(2000, 0, 6, 18, 14)) / 864e5) % syn + syn) % syn / syn;
+  const name = f < .03 || f > .97 ? 'New moon' : f < .22 ? 'Waxing crescent' : f < .28 ? 'First quarter' : f < .47 ? 'Waxing gibbous'
+    : f < .53 ? 'Full moon' : f < .72 ? 'Waning gibbous' : f < .78 ? 'Last quarter' : 'Waning crescent';
+  return { name, illum: Math.round((1 - Math.cos(2 * Math.PI * f)) / 2 * 100) };
+}
+function renderWxCard() {
+  const el = $('#wxcard'); if (!el) return;
+  const w = WX.now, ok = w && Date.now() - WX.at < 3 * 3600e3, moon = moonPhase(new Date());
+  let sun = '';
+  if (area) {
+    const st = sunTimes(new Date(), area.lat, area.lon), len = st.set - st.rise;
+    sun = `<div class="hsun">${icon('sun')}${hm(st.rise)}<span>${icon('moon')}${hm(st.set)}</span><span class="hm">${Math.floor(len / 3600e3)} h ${two(Math.round(len / 60e3) % 60)} of light</span></div>`;
+  }
+  const mn = `<div class="hmoon">${esc(moon.name)} · ${moon.illum}%</div>`;
+  if (!ok) { el.innerHTML = `<div class="hk mono">${icon('sun')}Weather</div><div class="hnone">${area ? 'Checking the sky…' : 'Waiting for your location.'}</div>${sun}${mn}`; return; }
+  let [ic, name] = WMO(w.code); if (ic === 'sun' && !w.day) ic = 'moon';
+  const extra = [w.feels != null ? `Feels ${w.feels}°` : '', w.wind != null ? `wind ${w.wind} km/h` : '', WX.day && WX.day.uv != null ? `UV ${WX.day.uv}` : ''].filter(Boolean).join(' · ');
+  const hours = (WX.hours || []).filter(h => h.t > Date.now() - 1800e3).slice(0, 6);
+  const hi = WX.day ? `<span class="hm">${WX.day.max}° / ${WX.day.min}°</span>` : '';
+  el.innerHTML = `<div class="hk mono">${icon(ic)}Weather${hi}</div>
+    <div class="wxnow"><b>${w.temp}°</b><div><div class="t">${esc(name)}</div><div class="s">${esc(extra)}</div></div></div>
+    ${w.rainAt ? `<div class="hrain">${icon('rain')}${w.rainAt === 'now' ? 'Raining now' : 'Rain likely from ' + esc(w.rainAt)}</div>` : ''}
+    ${hours.length ? `<div class="hours">${hours.map(h => { let [hi2] = WMO(h.code); const d = new Date(h.t), night = area && (() => { const s = sunTimes(d, area.lat, area.lon); return d < s.rise || d > s.set; })(); if (hi2 === 'sun' && night) hi2 = 'moon';
+        return `<div><span>${two(d.getHours())}</span>${icon(hi2)}<b>${h.temp}°</b><i class="${h.pp >= 50 ? 'wet' : ''}">${h.pp >= 20 ? h.pp + '%' : ''}</i></div>`; }).join('')}</div>` : ''}
+    ${sun}${mn}`;
+}
+
+// Gargantua, drawn by one fragment shader: the black shadow, the thin photon ring, the far side of the disk bent over the top
+// and under the bottom, the near side crossing in front, and stars bent around it all. It swirls faster while TARS thinks,
+// cools to blue while he listens and flares with his voice. Idle it drops to 15 frames a second (8 when dimmed at night)
+// so a docked phone stays cool; no WebGL, and a CSS picture of it stands in.
+const HOLE = { gl: null, u: {}, raf: 0, on: false, last: 0, prev: 0, lvl: 0, listen: 0, think: 0, spin: 0, t0: performance.now(), fail: false, frames: 0, lvlMax: 0 };
+const HOLE_VS = 'attribute vec2 p; void main() { gl_Position = vec4(p, 0., 1.); }';
+const HOLE_FS = `precision highp float;
+uniform vec2 res; uniform vec2 ctr; uniform float sz; uniform float t; uniform float lvl; uniform float listen; uniform float think; uniform float dim; uniform float spin;
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float n2(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f);
+  return mix(mix(h21(i), h21(i + vec2(1., 0.)), f.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), f.x), f.y); }
+float fbm(vec2 p) { float v = 0., a = .55; for (int i = 0; i < 4; i++) { v += a * n2(p); p = p * 2.07 + vec2(1.7, 9.2); a *= .5; } return v; }
+vec3 heat(float x) { x = clamp(x, 0., 1.);
+  vec3 c = mix(vec3(.42, .10, .02), vec3(1., .52, .16), smoothstep(0., .45, x));
+  c = mix(c, vec3(1., .80, .48), smoothstep(.45, .8, x));
+  return mix(c, vec3(1., .97, .90), smoothstep(.8, 1., x)); }
+void main() {
+  vec2 p = (gl_FragCoord.xy - ctr) / sz;
+  float R = .32, r = length(p), a = atan(p.y, p.x);
+  vec3 col = vec3(0.);
+  float Re = R * 1.5;
+  vec2 q = p * (1. - Re * Re / max(r * r, 1e-3));
+  vec2 g = floor(q * 38.);
+  float s = h21(g), tw = .6 + .4 * sin(t * (1. + 3. * s) + s * 40.);
+  float star = step(.972, s) * smoothstep(.38, 0., length(fract(q * 38.) - .5)) * tw;
+  col += vec3(.75, .85, 1.) * star * smoothstep(R * 1.15, R * 2.1, r);
+  col += vec3(.015, .03, .065) * (1. - smoothstep(0., 2.6, r));
+  float up = step(0., p.y);
+  float halo = smoothstep(R * .99, R * 1.07, r) * (1. - smoothstep(R * 1.12, R * mix(1.6, 2.15, up), r));
+  float side = pow(abs(sin(a)), .7) * mix(.72, 1.3, up);
+  float hs = fbm(vec2(a * 5. - spin * 1.2, r * 16.));
+  float hI = halo * (.28 + .72 * side) * (.5 + .95 * hs);
+  float dr = (r - R * 1.03) / (.010 + .007 * lvl);    // squares, never pow(): pow of a negative is undefined in GLSL (NaN on Apple GPUs)
+  float ring = exp(-dr * dr);
+  float shadow = smoothstep(R * .985, R * 1.005, r);
+  col *= shadow;
+  float x = abs(p.x), yb = p.y + .012 * p.x;
+  float th = .022 + .045 * smoothstep(0., 2.4, x);
+  float by = yb / th;
+  float band = exp(-by * by);
+  float bs = fbm(vec2(p.x * 3.5 + spin * 1.9, yb * 40.));
+  float dop = clamp(1. + .55 * (-p.x) / (x + .35), .55, 1.6);
+  float bI = band * (.22 + .78 * smoothstep(R * .2, R * 1.6, x)) * exp(-max(x - R * 2.2, 0.) * .5) * (.55 + .85 * bs) * dop;
+  float boost = 1. + 1.15 * lvl;
+  col += heat(.55 + .45 * hs) * hI * 1.15 * boost;
+  col += heat(.95) * ring * 1.6 * boost;
+  col += heat(.45 + .55 * bs * band) * bI * 1.5 * boost;
+  col += vec3(1., .55, .2) * exp(-max(r - R, 0.) * 7.) * .18 * boost * shadow;
+  col += vec3(1., .6, .25) * exp(-abs(yb) * 14.) * .07 * boost * smoothstep(R * .5, R * 2., x);
+  vec3 cool = col.bgr * vec3(.75, .95, 1.3) + vec3(0., .04, .12) * (ring + hI);
+  col = mix(col, cool, .6 * listen) * (1. + .25 * think * sin(t * 6. + a * 3.) * hI);
+  col *= dim;
+  col = 1. - exp(-col * 1.25);
+  gl_FragColor = vec4(pow(col, vec3(.92)), 1.);
+}`;
+function holeInit() {
+  if (HOLE.gl) return true;
+  if (HOLE.fail) return false;
+  const c = $('#hole');
+  try {
+    const gl = c.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, powerPreference: 'low-power', preserveDrawingBuffer: false });
+    if (!gl) throw new Error('no WebGL');
+    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader'); return s; };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, HOLE_VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, HOLE_FS)); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || 'link');
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    for (const n of ['res', 'ctr', 'sz', 't', 'lvl', 'listen', 'think', 'dim', 'spin']) HOLE.u[n] = gl.getUniformLocation(prog, n);
+    HOLE.gl = gl;
+    c.addEventListener('webglcontextlost', e => { e.preventDefault(); HOLE.gl = null; HOLE.fail = true; holeFlat('the black hole lost its WebGL context'); }, { once: true });
+    return true;
+  } catch (e) { HOLE.fail = true; holeFlat('black hole: ' + e.message); return false; }
+}
+function holeFlat(why) { log(why); $('#hole').classList.add('flat'); }
+function holeStart() { if (HOLE.on) return; HOLE.on = true; if (holeInit() && !HOLE.raf) HOLE.raf = requestAnimationFrame(holeFrame); }
+function holeStop() { HOLE.on = false; if (HOLE.raf) cancelAnimationFrame(HOLE.raf); HOLE.raf = 0; }
+function holeFrame(now) {
+  HOLE.raf = 0;
+  if (!HOLE.on || !HOLE.gl) return;
+  if (!document.hidden) {
+    const busy = T.st !== 'idle' && T.st !== 'error', amb = document.documentElement.classList.contains('ambient');
+    const fps = busy ? 60 : amb ? 8 : now - MODE.touched < 20000 ? 30 : 15;
+    if (now - HOLE.last >= 1000 / fps - 3) holeDraw(now);
+  }
+  HOLE.raf = requestAnimationFrame(holeFrame);
+}
+function holeDraw(now) {
+  const gl = HOLE.gl; if (!gl) return;
+  const c = gl.canvas, box = c.getBoundingClientRect(); if (box.width < 4 || box.height < 4) return;
+  const k = Math.min(devicePixelRatio || 1, 1.5), w = Math.round(box.width * k), h = Math.round(box.height * k);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; gl.viewport(0, 0, w, h); }
+  // centred in the space above the words, sized so the disk reaches the sides
+  const ro = $('.readout').getBoundingClientRect(), free = clamp(ro.top - box.top, box.height * .5, box.height);
+  const dt = Math.min(.1, (now - (HOLE.prev || now)) / 1000); HOLE.prev = now; HOLE.last = now;
+  let env = 0;
+  if (T.st === 'speaking' && V.cur && V.cur.env && V.cur.env.length) env = V.cur.env[Math.min(V.cur.env.length - 1, Math.floor((voiceEl.currentTime || 0) * 20))] || 0;
+  const to = (v, target, s) => v + (target - v) * Math.min(1, s * dt * 60);
+  HOLE.lvl = to(HOLE.lvl, T.st === 'speaking' ? env : T.st === 'listening' ? T.level * .5 : 0, .3);
+  HOLE.listen = to(HOLE.listen, T.st === 'listening' || T.st === 'arming' ? 1 : 0, .07);
+  HOLE.think = to(HOLE.think, T.st === 'thinking' || T.st === 'sending' ? 1 : 0, .05);
+  HOLE.spin += dt * (.22 + 1.5 * HOLE.think + .8 * HOLE.lvl);
+  HOLE.lvlMax = Math.max(HOLE.lvlMax, HOLE.lvl);
+  const html = document.documentElement, dim = html.classList.contains('ambient') ? .35 : 1;
+  const u = HOLE.u;
+  gl.uniform2f(u.res, w, h); gl.uniform2f(u.ctr, w / 2, h - free * k / 2); gl.uniform1f(u.sz, Math.min(w * .62, free * k * .78));
+  gl.uniform1f(u.t, (now - HOLE.t0) / 1000); gl.uniform1f(u.lvl, HOLE.lvl); gl.uniform1f(u.listen, HOLE.listen); gl.uniform1f(u.think, HOLE.think);
+  gl.uniform1f(u.dim, dim); gl.uniform1f(u.spin, HOLE.spin);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  HOLE.frames++;
+}
+function holeProbe() {                               // tests: draw a frame and read a few pixels back
+  if (!HOLE.gl) return null;
+  holeDraw(performance.now());
+  const gl = HOLE.gl, c = gl.canvas, px = (x, y) => { const b = new Uint8Array(4); gl.readPixels(Math.round(x), Math.round(y), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, b); return b[0] + b[1] + b[2]; };
+  const box = c.getBoundingClientRect(), ro = $('.readout').getBoundingClientRect(), k = c.width / box.width;
+  const free = clamp(ro.top - box.top, box.height * .5, box.height) * k, cy = c.height - free / 2, sz = Math.min(c.width * .62, free * .78);
+  return { w: c.width, h: c.height, center: px(c.width / 2, cy), ring: px(c.width / 2, cy + sz * .32 * 1.03), band: px(c.width / 2 - sz * .9, cy - sz * .012 * -.9), corner: px(4, 4), frames: HOLE.frames };
+}
+
 // ---------- TARS: listen, send, speak ----------
 const voiceEl = $('#voice');
 const T = { st: 'idle', rec: null, stream: null, chunks: [], ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null, tapAt: 0,
@@ -1709,18 +2108,23 @@ function fitReply() {
   r.classList.toggle('scrolls', r.scrollHeight > r.clientHeight + 1);
 }
 function fitLayout() {
-  // The phone's own bars (notch, home bar) take height the design didn't count on. Step down in three
-  // stages until the whole home screen fits and TARS still has room.
-  const app = $('#app');
-  app.classList.remove('c1', 'c2', 'c3');
+  // The phone's own bars (notch, home bar) take room the design didn't count on. Step down in stages until
+  // everything fits and TARS still has room: c1-c3 in portrait, h1-h3 for Home mode in portrait, l1-l2 for
+  // the right-hand column in landscape.
+  const app = $('#app'), home = appMode() === 'home';
+  app.classList.remove('c1', 'c2', 'c3', 'h1', 'h2', 'h3', 'l1', 'l2');
   if (matchMedia('(orientation: portrait)').matches) {
     // layout boxes (offsetTop/offsetHeight), not scrollHeight: the opening animation slides things down a
     // little, and that must not count as running out of room
-    const bot = $('.bottom'), padB = parseFloat(getComputedStyle(app).paddingBottom) || 0;
-    const fits = () => bot.offsetTop + bot.offsetHeight <= app.clientHeight - padB + 1 && $('#tars').offsetHeight >= 196;
-    for (const c of ['c1', 'c2', 'c3']) { if (fits()) break; app.classList.add(c); }
+    const bot = home ? $('.menu') : $('.bottom'), padB = parseFloat(getComputedStyle(app).paddingBottom) || 0;
+    const fits = () => bot.offsetTop + bot.offsetHeight <= app.clientHeight - padB + 1 && $('#tars').offsetHeight >= (home ? 200 : 196);
+    for (const c of home ? ['h1', 'h2', 'h3'] : ['c1', 'c2', 'c3']) { if (fits()) break; app.classList.add(c); }
+  } else if (!home) {
+    const g = $('.groups');
+    for (const c of ['l1', 'l2']) { if (g.scrollHeight <= g.clientHeight + 1) break; app.classList.add(c); }
   }
   fitReply();
+  if (home && HOLE.on) holeDraw(performance.now());
 }
 let fitT = 0;
 const fitSoon = () => { clearTimeout(fitT); fitT = setTimeout(() => requestAnimationFrame(fitLayout), 60); };
@@ -2071,6 +2475,7 @@ function animate(t) {
     }
     if (moved) follow(V.cur.last);
   }
+  if (appMode() === 'home') return;                // Gargantua draws itself (holeFrame)
   for (let i = 0; i < 4; i++) {
     let target;
     if (T.st === 'listening' || T.st === 'arming') target = 0.08 + T.level * (0.78 + 0.22 * Math.sin(t / 95 + i * 1.7));
@@ -2085,7 +2490,7 @@ function animate(t) {
 // ---------- home screen tiles ----------
 function renderQuick() {
   $('#quick').innerHTML = (camRecording() ? '<button class="camsave" data-camsave><i></i>Save clip</button>' : '')
-    + quick.map((q, i) => `<button data-q="${i}">${esc(q.label)}</button>`).join('');
+    + quickList().map((q, i) => `<button data-q="${i}">${esc(q.label)}</button>`).join('');
   setState(T.st, T.st === 'idle' ? null : $('#status').textContent);
 }
 function tile(o) {
@@ -2112,7 +2517,7 @@ function renderTiles() {
 document.addEventListener('click', e => {
   if (e.target.closest('[data-camsave]')) { camSave('button'); return; }
   const q = e.target.closest('#quick button[data-q]');
-  if (q) { const it = quick[+q.dataset.q]; if (it) ask(it.text, it.label); return; }
+  if (q) { const it = quickList()[+q.dataset.q]; if (it) ask(it.text, it.label); return; }
   const t = e.target.closest('.tile');
   if (t) {
     const { act, id, kind } = t.dataset;
@@ -2139,6 +2544,7 @@ document.addEventListener('pointerdown', e => {
 function guard() { if (driving()) { toast('Park first. Menus are locked while you drive.'); return false; } return true; }
 $('#tars').addEventListener('click', onTarsTap);
 $('#camchip').addEventListener('click', camChipTap);
+$('#modebtn').addEventListener('click', modeTap);
 $('#linkdot').addEventListener('click', () => { if (guard()) openSheet('settings'); });
 $('#wx').addEventListener('click', () => {
   const w = WX.now; if (!w) return;
@@ -2293,6 +2699,10 @@ const SHEETS = {
       <div class="card"><h3>Dash cam</h3><p>Records the road whenever TARS Drive is open, with no picture on screen and no sound. Say “save that” or tap Save clip to keep a moment; it goes to your PC by itself.</p>
         ${seg('cam', [['1', 'On'], ['0', 'Off']], camCfg.on ? '1' : '0')}
         <div class="acts"><button class="btn small" id="scam">${icon('cam')} Clips, aim and settings</button></div></div>
+      <div class="card"><h3>Home mode</h3><p>The phone on its stand at home: the black hole in the middle (tap it and talk), the weather and your car around it, and TARS talking like he’s in the room. The dash cam stays off.</p>
+        ${seg('autohome', [['1', 'Switch by itself'], ['0', 'Only by hand']], cfg.autoHome === false ? '0' : '1')}
+        <p class="note">${homeSpot() ? 'It switches on at your Home spot and back to Drive as soon as the car moves.' : 'To switch by itself it needs Home saved as a spot: Places, Home, “Use where I am”, while you’re at home.'} Or tap Home or Drive in the bottom corner when you’re stopped.</p>
+        <div class="acts"><button class="btn small" id="smode">${appMode() === 'home' ? 'Switch to Drive mode' : 'Switch to Home mode'}</button></div></div>
       <div class="card"><h3>Humor setting</h3><p>TARS’s own dial. It’s told this with every question.</p>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><b style="font:300 34px var(--display)" id="shv">${cfg.humor}%</b></div>
         <input type="range" id="shum" min="0" max="100" step="5" value="${cfg.humor}"></div>
@@ -2300,8 +2710,8 @@ const SHEETS = {
       <div class="card"><h3>Look</h3><p>Auto goes to the dim night look at sunset.</p>${seg('theme', [['auto', 'Auto'], ['day', 'Day'], ['night', 'Night']], cfg.theme)}
         <p class="note" style="margin-top:12px">Effects: the sky that follows the sun, the glass, TARS's sheen and reflection. Slow on purpose; off if the iPhone has Reduce Motion on.</p>
         ${seg('fx', [['1', 'Effects on'], ['0', 'Plain']], cfg.fx ? '1' : '0')}</div>
-      <div class="card"><h3>Quick asks</h3><p>The buttons under TARS. One per line: Button label = what TARS hears.</p>
-        <textarea class="field" id="squick" rows="7">${esc(quick.map(q => `${q.label} = ${q.text}`).join('\n'))}</textarea>
+      <div class="card"><h3>Quick asks${appMode() === 'home' ? ' in Home mode' : ''}</h3><p>The buttons under ${appMode() === 'home' ? 'the black hole' : 'TARS'}. One per line: Button label = what TARS hears. ${appMode() === 'home' ? 'Drive' : 'Home'} mode has its own set.</p>
+        <textarea class="field" id="squick" rows="7">${esc(quickList().map(q => `${q.label} = ${q.text}`).join('\n'))}</textarea>
         <div class="acts"><button class="btn" id="squicksave">Save buttons</button><button class="btn small" id="squickreset">Reset</button></div></div>
       <div class="card"><h3>Telegram fallback</h3><p>If the PC can’t be reached, a button opens Telegram. Put the bot’s username here to land straight in its chat.</p>
         <input class="field" id="stg" placeholder="bot username (optional)" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(cfg.tg)}"></div>
@@ -2350,17 +2760,24 @@ const SHEETS = {
       if (s.dataset.seg === 'theme') { cfg.theme = b.dataset.v; applyTheme(); }
       if (s.dataset.seg === 'fx') { cfg.fx = b.dataset.v === '1'; document.documentElement.classList.toggle('fx', cfg.fx); }
       if (s.dataset.seg === 'cam') { if (b.dataset.v === '1') camTurnOn(); else camTurnOff(); }
+      if (s.dataset.seg === 'autohome') { cfg.autoHome = b.dataset.v === '1'; MODE.at = null; MODE.first = true; }
       saveCfg();
     }));
     $('#squicksave', B).onclick = () => {
       const q = $('#squick', B).value.split('\n').map(l => l.split('=')).filter(p => p[0].trim())
         .map(([l, ...r]) => ({ label: l.trim().slice(0, 24), text: (r.join('=').trim() || l.trim()).slice(0, 400) })).slice(0, 12);
-      quick = q.length ? q : DEFAULT_QUICK; store.set('quick', quick); toast('Quick asks saved');
+      if (appMode() === 'home') { quickHome = q.length ? q : DEFAULT_QUICK_HOME; store.set('quickHome', quickHome); }
+      else { quick = q.length ? q : DEFAULT_QUICK; store.set('quick', quick); }
+      renderQuick(); toast('Quick asks saved');
     };
-    $('#squickreset', B).onclick = () => { quick = DEFAULT_QUICK; store.set('quick', quick); renderSheet(); };
+    $('#squickreset', B).onclick = () => {
+      if (appMode() === 'home') { quickHome = DEFAULT_QUICK_HOME; store.set('quickHome', quickHome); } else { quick = DEFAULT_QUICK; store.set('quick', quick); }
+      renderQuick(); renderSheet();
+    };
     $('#stg', B).onchange = e => { cfg.tg = e.target.value.trim().replace(/^@/, ''); saveCfg(); };
     $('#ssetup', B).onclick = () => { store.set('setupHidden', false); openSheet('setup'); };
     $('#scam', B).onclick = () => openSheet('cam');
+    $('#smode', B).onclick = () => { closeSheet(); modeTap(); };
     $('#sreset', B).onclick = () => modal('Reset TARS Drive?', 'Deletes places, playlists, history, checks and the PC address from this phone.', [{ label: 'Cancel' },
       { label: 'Reset', hot: true, run: () => { try { Object.keys(localStorage).filter(k => k.startsWith('drive.')).forEach(k => localStorage.removeItem(k)); } catch {} location.reload(); } }]);
   },
@@ -2451,7 +2868,7 @@ function renderChecks(B) {
 function report() {
   return { app: VERSION, at: new Date().toISOString(), ua: navigator.userAgent, standalone: standalone(), screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
     checks, maps: cfg.maps, links: { google: linkMethod('google'), waze: linkMethod('waze'), spotify: linkMethod('spotify') }, places: places.length, pinned: music.length, mime: pickAudioMime(), log: LOG.slice(-60),
-    cam: camReport(), camLog: CAM.log.slice(-60) };
+    cam: camReport(), camLog: CAM.log.slice(-60), mode: appMode(), homeSpot: !!homeSpot(), hole: HOLE.gl ? 'webgl' : HOLE.fail ? 'flat' : 'off' };
 }
 async function runCheck(id) {
   const LT = LINK_TESTS.find(x => x[0] === id);
@@ -2555,7 +2972,9 @@ function demo(kind) {
   musicLoop = () => {}; renderNow();
   checks = { install: { ok: true }, speaker: { ok: true }, mic: { ok: true }, gps: { ok: true } };
   CAM.demo = true; camCfg.on = true; CAM.started = Date.now() - (23 * 60 + 4) * 1000; camUi();
-  if (kind === 'night') cfg.theme = 'night';
+  if (kind === 'night' || kind === 'homenight') cfg.theme = 'night';
+  if (kind.startsWith('home')) return demoHome(kind);
+  setAppMode('drive', 'boot');
   renderTiles(); renderQuick(); renderWx(); renderSub(); renderSpeed(); renderLink(); applyTheme();
   $('#said').textContent = '“How long is the drive home right now?”';
   if (kind === 'listening') { setState('listening'); $('#said').textContent = ''; setReply('Go ahead. I stop when you do.', 'hint'); setInterval(() => { T.level = 0.35 + 0.5 * Math.abs(Math.sin(Date.now() / 300)); }, 50); }
@@ -2568,6 +2987,30 @@ function demo(kind) {
     if (kind === 'go') showGo('Home');
     if (kind === 'play') showPlay({ url: 'https://open.spotify.com/playlist/demo2', name: 'Commute Heat' });
   }
+  fitLayout();
+  const m = /sheet=(\w+)/.exec(location.hash); if (m) openSheet(m[1]);
+}
+
+function demoHome(kind) {
+  const at = h => new Date(Date.now() - h * 3600e3).toISOString();
+  HOMED.data = { car: { state: 'parked', since: at(3), where: 'Home', battery: 12.6, odometer: 48210, seen: at(.1),       // made up
+    last: { start: at(3.52), end: at(3), km: 14.2, min: 31, max: 94, from: 'Work', to: 'Home', live: false }, today: { drives: 3, km: 41.5, min: 72 } },
+    clips: { today: 2, saved: 2, last: { t: '16:05:12', source: 'button', state: 'saved' } } };
+  HOMED.at = Date.now();
+  WX.now = { temp: 19, code: 2, day: kind === 'homenight' ? 0 : 1, rainAt: null, feels: 17, wind: 14, hum: 72 };
+  WX.hours = Array.from({ length: 8 }, (_, i) => ({ t: Date.now() + i * 3600e3, temp: 19 - i, pp: [0, 0, 10, 30, 60, 70, 40, 10][i], code: [2, 2, 3, 3, 61, 61, 3, 2][i] }));
+  WX.day = { max: 26, min: 14, uv: 9 };
+  G.moving = false; G.fix = { t: Date.now() + 1e9, lat: 0, lon: 0, acc: 5, spd: 0 };
+  setAppMode('home', 'boot'); applyTheme(); renderTiles(); renderLink(); renderNow(); renderWxCard(); renderCarCard(); renderSpeed();
+  $('#said').textContent = '“What’s the weather doing tonight?”';
+  if (kind === 'homelisten') { setState('listening'); $('#said').textContent = ''; setReply('Go ahead. I stop when you do.', 'hint'); setInterval(() => { T.level = 0.35 + 0.5 * Math.abs(Math.sin(Date.now() / 300)); }, 50); }
+  else if (kind === 'homethink') { setState('thinking', 'Thinking'); setReply('…', 'hint'); }
+  else if (kind === 'homespeak' || kind === 'homenight') {
+    setReply('<span class="sent"><span class="w on">Clear</span> <span class="w on">by</span> <span class="w on cur">midnight,</span> <span class="w up">nineteen</span> <span class="w up">degrees</span> <span class="w up">now.</span></span> <span class="sent"><span class="w up">Your</span> <span class="w up">car’s</span> <span class="w up">parked</span> <span class="w up">at</span> <span class="w up">home</span> <span class="w up">and</span> <span class="w up">the</span> <span class="w up">battery’s</span> <span class="w up">healthy.</span></span>');
+    setState('speaking'); V.cur = { id: 0, env: Array.from({ length: 400 }, (_, i) => 0.3 + 0.6 * Math.abs(Math.sin(i / 2.3))), url: '' };
+    Object.defineProperty(voiceEl, 'currentTime', { get: () => (Date.now() / 1000) % 19 });
+  } else { setState('idle'); setReply('Tap the black hole and talk.', 'hint'); }
+  if (kind === 'homeamb') { MODE.touched = -1e9; document.documentElement.dataset.theme = 'night'; document.documentElement.classList.add('ambient'); }
   fitLayout();
   const m = /sheet=(\w+)/.exec(location.hash); if (m) openSheet(m[1]);
 }
@@ -2586,6 +3029,7 @@ function demo(kind) {
   const d = /#demo(?:=(\w+))?/.exec(location.hash);
   setInterval(camTick, 500);
   if (d) { demo(d[1] || 'idle'); return; }
+  setAppMode(MODE.cur, 'boot');
   camBoot();
   gpsOn(); linkLoop(); musicLoop();
   setInterval(() => { if (SP.connected && SP.now && SP.now.playing && document.visibilityState === 'visible') renderNow(); }, 1000);
