@@ -139,6 +139,17 @@ html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
 .tile.ghost { background: transparent; border-style: dashed; border-color: var(--line2); color: var(--dim); }
 .tile.hot svg.i { color: var(--amber); }
 
+.np { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 8px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); position: relative; overflow: hidden; }
+.np .art { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; background: var(--card2); flex: none; }
+.np .art.none { display: grid; place-items: center; color: var(--faint); }
+.np .meta { flex: 1; min-width: 0; }
+.np .meta .t { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np .meta .s { color: var(--dim); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np .npb { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--card2); flex: none; }
+.np .npb.big { width: 54px; background: var(--ink); color: var(--bg); }
+.np .npb:active { transform: scale(.94); }
+.np .bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--amber); width: 0; transition: width 1s linear; opacity: .8; }
+.np.idle .npb { opacity: .45; }
 .bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; flex: none; }
 .drive, .menu { display: flex; align-items: center; gap: 10px; }
 .speed { display: flex; align-items: baseline; gap: 5px; min-width: 76px; }
@@ -177,6 +188,11 @@ html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
   .iconbtn { width: 40px; height: 40px; border-radius: 13px; }
   .speed b { font-size: 26px; }
   .setupbar { margin-top: 6px; }
+  .np { padding: 5px; gap: 8px; }
+  .np .art { width: 36px; height: 36px; border-radius: 8px; }
+  .np .npb { width: 38px; height: 38px; border-radius: 11px; }
+  .np .npb.big { width: 42px; }
+  .np .meta .t { font-size: 13px; } .np .meta .s { font-size: 11px; }
 }
 @media (orientation: portrait), (min-height: 521px) { .groups { display: contents; } }
 
@@ -259,6 +275,10 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
   <symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 9h16M3 13h18M5 17h14"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7 2.5 2.5 7Z"/><path d="m21 3-11 10"/></symbol>
   <symbol id="i-loc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M18.5 5.5 9 12l9.5 6.5Z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M5.5 5.5 15 12l-9.5 6.5Z"/></symbol>
+  <symbol id="i-playf" viewBox="0 0 24 24"><path d="M7 4.8v14.4L19 12Z" fill="currentColor"/></symbol>
+  <symbol id="i-pausef" viewBox="0 0 24 24"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></symbol>
   <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="m16 10.5 5-3v9l-5-3"/></symbol>
 </svg>
 
@@ -292,7 +312,12 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 
   <div class="groups">
     <section class="group"><div class="label mono">Go <span id="mapsname"></span></div><div class="tiles" id="gotiles"></div></section>
-    <section class="group"><div class="label mono">Music</div><div class="tiles" id="musictiles"></div></section>
+    <section class="group"><div class="label mono">Music <span id="npdev"></span></div>
+      <div class="np" id="np" hidden><div class="art none" id="npartbox"><svg class="i"><use href="#i-note"/></svg></div><div class="meta"><div class="t" id="nptitle"></div><div class="s" id="npsub"></div></div>
+        <button class="npb" data-np="previous" aria-label="Previous"><svg class="i"><use href="#i-prev"/></svg></button>
+        <button class="npb big" data-np="toggle" aria-label="Play or pause"><svg class="i" id="nptoggle"><use href="#i-playf"/></svg></button>
+        <button class="npb" data-np="next" aria-label="Next"><svg class="i"><use href="#i-next"/></svg></button><i class="bar" id="npbar"></i></div>
+      <div class="tiles" id="musictiles"></div></section>
   </div>
 
   <div class="bottom">
@@ -318,7 +343,7 @@ html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -335,7 +360,7 @@ window.addEventListener('error', e => log('JS error: ' + e.message));
 window.addEventListener('unhandledrejection', e => log('JS rejection: ' + (e.reason && e.reason.message || e.reason)));
 
 // ---------- settings and saved things ----------
-const DEFAULT_CFG = { humor: 75, voice: true, maps: 'google', theme: 'auto', tg: '', link: { google: 'app', waze: 'app', apple: 'web', spotify: 'app' } };
+const DEFAULT_CFG = { humor: 75, voice: true, duck: true, maps: 'google', theme: 'auto', tg: '', link: { google: 'app', waze: 'app', apple: 'web', spotify: 'app' } };
 const DEFAULT_QUICK = [
   { label: 'Drive home?', text: 'How long is the drive home right now?' },
   { label: "Who's waiting?", text: "Who's waiting on me on WhatsApp?" },
@@ -564,6 +589,90 @@ function goQuery(q) { openExternal(mapsLink(cfg.maps, cfg.link[cfg.maps] || 'app
 function playUrl(url) { openExternal(spotifyLink(url, cfg.link.spotify)); }
 function openTelegram() { openExternal(cfg.tg ? `tg://resolve?domain=${encodeURIComponent(cfg.tg.replace(/^@/, ''))}` : 'tg://'); }
 
+// ---------- Spotify on the car's playing device, through the PC (car_spotify.py) ----------
+// The PC holds the Spotify sign-in; this screen asks it to pause, resume, skip or play. Music pauses when
+// you tap TARS and comes back when TARS has finished; a playlist TARS finds starts in the car on its own.
+const SP = { configured: false, connected: false, now: null, err: '', at: 0, timer: 0, tick: 0, busy: false };
+async function musicPost(what, body) {
+  if (!pcBase()) return null;
+  try {
+    const r = await fetch(`${pcBase()}/music/${what}`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body || {}), cache: 'no-store' });
+    const j = await r.json().catch(() => ({ ok: false, error: 'PC said ' + r.status }));
+    if (!r.ok && !j.error) j.error = 'PC said ' + r.status;
+    if (j.ok === false || !r.ok) log(`music ${what}: ${j.error}`);
+    musicSoon(600);
+    return j;
+  } catch (e) { log(`music ${what}: ${e.message}`); return null; }
+}
+async function musicStatus() {
+  if (!pcBase() || document.visibilityState !== 'visible' || SP.busy) return;
+  SP.busy = true;
+  try {
+    const r = await fetch(`${pcBase()}/music`, { cache: 'no-store' });
+    if (r.status === 404) { Object.assign(SP, { configured: false, connected: false, now: null, err: 'old PC link' }); return; }
+    const j = await r.json();
+    Object.assign(SP, { configured: !!j.configured, connected: !!j.connected, now: j.now || null, err: j.error || '', at: Date.now() });
+    if (j.connected && (!checks.spotify || !checks.spotify.ok)) setCheck('spotify', true, 'Linked through the PC');
+    if (j.connected && SP.waitLink) { SP.waitLink = 0; toast('Spotify linked ✓'); if (sheetName === 'settings') renderSheet(); }
+  } catch (e) { SP.err = "can't reach the PC"; }
+  finally { SP.busy = false; renderNow(); }
+}
+let musicLoop = function () {
+  clearTimeout(SP.timer);
+  const waiting = !SP.connected && SP.waitLink && Date.now() - SP.waitLink < 180000;   // just sent him to sign in: check often
+  musicStatus().finally(() => { SP.timer = setTimeout(musicLoop, SP.connected ? 5000 : waiting ? 2500 : 30000); });
+};
+function musicSoon(ms = 300) { clearTimeout(SP.timer); SP.timer = setTimeout(musicLoop, ms); }
+const ducking = () => SP.connected && cfg.duck;
+function musicDuck() { if (!ducking() || T.ducked) return; T.ducked = true; clearTimeout(T.unduckT); musicPost('duck'); }
+function musicAfterTurn() {
+  // TARS has finished: start what TARS found, or give back the music it paused
+  clearTimeout(T.unduckT);
+  T.unduckT = setTimeout(() => {
+    if (T.st !== 'idle' && T.st !== 'error') return;
+    if (T.pendingPlay) { const pl = T.pendingPlay; T.pendingPlay = null; T.ducked = false; musicPlay(pl.url, pl.name); return; }
+    if (T.ducked) { T.ducked = false; musicPost('unduck'); }
+  }, 700);
+}
+async function musicPlay(url, name) {
+  if (!SP.connected) { playUrl(url); return; }
+  const j = await musicPost('play', { link: url });
+  if (j && j.ok) toast(`Playing ${name || 'it'}${SP.now && SP.now.device && SP.now.device.name ? ' on ' + SP.now.device.name : ''}`);
+  else if (j && j.code === 'nodevice') { toast('Start Spotify on your phone, then try again'); }
+  else playUrl(url);                                 // the PC couldn't: open it in Spotify instead
+}
+function renderNow() {
+  const bar = $('#np'), n = SP.now;
+  if (!SP.connected) { bar.hidden = true; $('#npdev').textContent = ''; return; }
+  bar.hidden = false;
+  const active = n && n.active && n.track;
+  bar.classList.toggle('idle', !active);
+  $('#nptitle').textContent = active ? n.track : (SP.err ? 'Spotify' : 'Nothing playing');
+  $('#npsub').textContent = active ? n.artist : (SP.err || 'Start Spotify on your phone');
+  $('#npdev').textContent = active && n.device && n.device.name ? '· on ' + n.device.name : '';
+  const box = $('#npartbox');
+  if (active && n.art) {
+    if (!box.querySelector('img') || box.querySelector('img').dataset.src !== n.art) {
+      box.className = 'art'; box.innerHTML = '';
+      const img = document.createElement('img'); img.className = 'art'; img.alt = ''; img.dataset.src = n.art; img.src = n.art;
+      img.onerror = () => { box.className = 'art none'; box.innerHTML = icon('note'); };
+      box.appendChild(img);
+    }
+  } else if (!box.classList.contains('none')) { box.className = 'art none'; box.innerHTML = icon('note'); }
+  $('#nptoggle').innerHTML = `<use href="#i-${active && n.playing ? 'pausef' : 'playf'}"/>`;
+  const pct = active && n.duration_ms ? clamp(((n.progress_ms || 0) + (n.playing ? Date.now() - SP.at : 0)) / n.duration_ms, 0, 1) : 0;
+  $('#npbar').style.width = (pct * 100).toFixed(1) + '%';
+}
+$('#np').addEventListener('click', async e => {
+  const b = e.target.closest('[data-np]'); if (!b) return;
+  wakeOn();
+  const n = SP.now, act = b.dataset.np === 'toggle' ? (n && n.active && n.playing ? 'pause' : 'play') : b.dataset.np;
+  T.ducked = false;                                   // his own command wins over the pause for TARS
+  if (n && (act === 'pause' || act === 'play')) { n.playing = act === 'play'; renderNow(); }
+  const j = await musicPost('control', { action: act });
+  if (j && j.ok === false) toast(j.error);
+});
+
 // ---------- TARS: listen, send, speak ----------
 const voiceEl = $('#voice');
 const T = { st: 'idle', rec: null, stream: null, chunks: [], ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null,
@@ -576,6 +685,7 @@ function setState(st, status) {
   card.className = 'tars ' + (st === 'arming' || st === 'sending' ? (st === 'arming' ? 'listening' : 'thinking') : st) + ($('#action').hidden ? '' : ' has-action');
   $('#status').textContent = status || (st === 'idle' ? `TARS · humor ${cfg.humor}%` : STATUS[st]);
   document.querySelectorAll('#quick button').forEach(b => { b.disabled = st !== 'idle' && st !== 'error'; });
+  if ((st === 'idle' || st === 'error') && (T.ducked || T.pendingPlay)) musicAfterTurn();
 }
 function setReply(html, cls = '') { const r = $('#reply'); r.className = 'reply ' + cls; r.innerHTML = html; }
 function unlockAudio() {
@@ -597,6 +707,7 @@ function onTarsTap(e) {
   if (T.st === 'arming') return;
   unlockAudio();
   if (!pcBase()) { notLinked(); return; }
+  musicDuck();
   startListening();
 }
 function pickAudioMime() {
@@ -750,7 +861,8 @@ function onEvent(ev, turn) {
     case 'say': addSentence(ev, turn); break;
     case 'voice': enqueueVoice(ev); break;
     case 'go': turn.actions.push({ t: 'go', place: ev.place }); showGo(ev.place); break;
-    case 'play': turn.actions.push({ t: 'play', url: ev.url, name: ev.name }); rememberTars(ev); showPlay(ev); break;
+    case 'play': turn.actions.push({ t: 'play', url: ev.url, name: ev.name }); rememberTars(ev); showPlay(ev); if (SP.connected) T.pendingPlay = { url: ev.url, name: ev.name }; break;
+    case 'music': musicSoon(400); break;
     case 'error':
       if (ev.code === 'silence' || ev.code === 'short') { turn.error = ev.msg; stopVoice(); setReply(esc(ev.msg) + ' Tap TARS and try again.', 'hint'); setState('idle'); }
       else { turn.error = ev.msg; showError(ev.msg, false); }
@@ -791,7 +903,7 @@ function playNext() {
     if (err.name === 'NotAllowedError') {                // iOS wants a tap first: keep the reply and ask for one
       V.q.unshift(item); V.cur = null; markAll('');
       setState('idle', 'Tap to hear TARS');
-      showAction({ title: 'Tap to hear TARS', sub: 'iOS wants a tap before it plays sound', button: 'PLAY', run: () => playNext() });
+      showAction({ title: 'Tap to hear TARS', sub: 'iOS wants a tap before it plays sound', button: 'PLAY', run: () => { musicDuck(); playNext(); } });
       return;
     }
     voiceDone();
@@ -834,6 +946,7 @@ async function ask(text, label) {
   wakeOn(); unlockAudio();
   if (T.st !== 'idle' && T.st !== 'error') return;
   if (!pcBase()) { notLinked(); return; }
+  musicDuck();
   sendTurn({ text, label });
 }
 
@@ -856,7 +969,8 @@ function showGo(name) {
 }
 function showPlay(ev) {
   const pinned = music.some(m => m.url === ev.url);
-  showAction({ title: ev.name || 'Playlist from TARS', sub: 'Spotify', button: 'PLAY', run: () => playUrl(ev.url),
+  showAction({ title: ev.name || 'Playlist from TARS', sub: SP.connected ? 'Starts in the car when TARS is done' : 'Spotify', button: 'PLAY',
+    run: () => { T.pendingPlay = null; musicPlay(ev.url, ev.name); },
     alt: pinned ? null : { label: 'Pin', run: () => { pinMusic(ev.url, ev.name); toast('Pinned to Music'); clearAction(); } } });
 }
 function rememberTars(ev) {
@@ -924,7 +1038,7 @@ document.addEventListener('click', e => {
     else if (act === 'addplace') { if (!guard()) return; openSheet('places', { add: kind }); }
     else if (act === 'sheet') { if (!guard()) return; openSheet(id); }
     else if (act === 'spotify') openExternal(cfg.link.spotify === 'app' ? 'spotify:' : 'https://open.spotify.com/');
-    else if (act === 'music') playUrl(id);
+    else if (act === 'music') { const m = music.find(x => x.url === id) || fromTars.find(x => x.url === id); musicPlay(id, m && m.name); }
     else if (act === 'ask') { const it = DEFAULT_QUICK[+id]; ask(it.text, it.label); }
     return;
   }
@@ -962,10 +1076,11 @@ function setupSteps() {
     { id: 'check', done: Object.keys(checks).length >= 4, title: 'Check this phone', text: 'Speaker, microphone, location and which map and music apps open from here.' },
     { id: 'places', done: places.length > 0, title: 'Save your places', text: 'Home, work and gym, saved on this phone only.' },
     { id: 'link', done: !!(checks.pc && checks.pc.ok), title: 'Link TARS', text: 'Needs Tailscale on the PC and this phone. Then TARS hears you and answers out loud.' },
+    { id: 'spotify', done: SP.connected, title: 'Link Spotify (optional)', text: 'Music pauses while TARS talks, and the play, pause and skip buttons work right here.' },
   ];
 }
 function renderSetupBar() {
-  const s = setupSteps(), left = s.filter(x => !x.done).length, b = $('#setupbar');
+  const s = setupSteps().filter(x => x.id !== 'spotify'), left = s.filter(x => !x.done).length, b = $('#setupbar');
   if (!left || store.get('setupHidden', false)) { b.hidden = true; return; }
   b.hidden = false; b.innerHTML = `Finish setup · ${s.length - left} of ${s.length} ›`;
 }
@@ -1053,7 +1168,7 @@ const SHEETS = {
     };
     B.addEventListener('click', e => {
       const p = e.target.closest('[data-mplay]'), d = e.target.closest('[data-mdel]'), pin = e.target.closest('[data-mpin]');
-      if (p) playUrl(p.dataset.mplay);
+      if (p) { const m = music.find(x => x.url === p.dataset.mplay) || fromTars.find(x => x.url === p.dataset.mplay); musicPlay(p.dataset.mplay, m && m.name); }
       if (d) { music = music.filter(m => m.id !== d.dataset.mdel); store.set('music', music); renderSheet(); }
       if (pin) { pinMusic(pin.dataset.mpin, pin.dataset.name); renderSheet(); }
     }, { once: false });
@@ -1070,6 +1185,16 @@ const SHEETS = {
       <div class="card"><h3>TARS link</h3><p>Your PC’s Tailscale name, ending in .ts.net (in the Tailscale app, tap the PC and copy its name). Tailscale must be on for TARS to hear you.</p>
         <input class="field" id="spc" placeholder="pc-name.tailnet.ts.net" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(pcRaw())}">
         <div class="acts"><button class="btn hot" id="spctest">Save + test</button></div><p id="spcres">${linkText()}</p></div>
+      <div class="card"><h3>Spotify</h3><p id="spstat">${spText()}</p>
+        <div ${SP.connected ? 'hidden' : ''}><ol class="how">
+          <li>On <b>developer.spotify.com/dashboard</b>, log in and tap <b>Create app</b>. Any name (TARS Drive), any description.</li>
+          <li>Redirect URI, exactly: <b style="-webkit-user-select:all;user-select:all;word-break:break-all">${esc((pcBase() || 'https://<your-pc>.ts.net/car') + '/music/callback')}</b> <button class="btn small" id="spcopy">Copy</button></li>
+          <li>Tick <b>Web API</b>, agree, Save. Copy the <b>Client ID</b> and paste it here.</li></ol>
+          <input class="field" id="spcid" placeholder="Client ID (32 letters and digits)" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <div class="acts"><button class="btn hot" id="spgo">Connect Spotify</button></div></div>
+        <p class="note">Plays and pauses on whichever device Spotify is playing on, like your main iPhone in the car. Needs Premium.</p>
+        ${seg('duck', [['1', 'Pause music while TARS talks'], ['0', 'Leave it playing']], cfg.duck ? '1' : '0')}
+        <p class="note" id="spmsg"></p></div>
       <div class="card"><h3>Humor setting</h3><p>TARS’s own dial. It’s told this with every question.</p>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><b style="font:300 34px var(--display)" id="shv">${cfg.humor}%</b></div>
         <input type="range" id="shum" min="0" max="100" step="5" value="${cfg.humor}"></div>
@@ -1091,11 +1216,29 @@ const SHEETS = {
       try { await hello(10000); r.textContent = linkText(); setCheck('pc', true, `${L.rtt} ms`); }
       catch { r.textContent = linkText(); setCheck('pc', false, L.err); }
     };
+    const spm = t => { $('#spmsg', B).textContent = t; };
+    const cp = $('#spcopy', B);
+    if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(pcBase() + '/music/callback'); toast('Copied'); } catch { spm('Copy was blocked: long-press the address instead.'); } };
+    const go = $('#spgo', B);
+    if (go) go.onclick = async () => {
+      const cid = $('#spcid', B).value.trim().toLowerCase();
+      if (!pcBase()) { spm('Link TARS first (above).'); return; }
+      if (!/^[0-9a-f]{32}$/.test(cid)) { spm('That doesn’t look like a Client ID: it’s 32 letters and digits.'); return; }
+      try {
+        const r = await fetch(`${pcBase()}/music/setup`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ client_id: cid, base: pcBase() }) });
+        const j = await r.json();
+        if (!r.ok) { spm(j.error || 'The PC said ' + r.status); return; }
+        spm('Opening Spotify… approve it, then come back here.');
+        SP.waitLink = Date.now(); musicSoon(2500);
+        openExternal(`${pcBase()}/music/login`);
+      } catch { spm('Couldn’t reach the PC.'); }
+    };
     $('#shum', B).oninput = e => { cfg.humor = +e.target.value; $('#shv', B).textContent = cfg.humor + '%'; saveCfg(); if (T.st === 'idle') setState('idle'); };
     B.querySelectorAll('[data-seg]').forEach(s => s.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
       s.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
       if (s.dataset.seg === 'voice') cfg.voice = b.dataset.v === '1';
+      if (s.dataset.seg === 'duck') cfg.duck = b.dataset.v === '1';
       if (s.dataset.seg === 'theme') { cfg.theme = b.dataset.v; applyTheme(); }
       saveCfg();
     }));
@@ -1113,7 +1256,7 @@ const SHEETS = {
   setup(B) {
     const s = setupSteps();
     B.innerHTML = s.map((x, i) => `<div class="step${x.done ? ' done' : ''}"><div class="num">${x.done ? '✓' : i + 1}</div><div class="grow"><div class="t" style="font-weight:700">${esc(x.title)}</div>
-      <p class="note">${esc(x.text)}</p>${x.done ? '' : `<div class="acts"><button class="btn small hot" data-step="${x.id}">${{ install: 'How', check: 'Check now', places: 'Add places', link: 'Link' }[x.id]}</button></div>`}</div></div>`).join('')
+      <p class="note">${esc(x.text)}</p>${x.done ? '' : `<div class="acts"><button class="btn small hot" data-step="${x.id}">${{ install: 'How', check: 'Check now', places: 'Add places', link: 'Link', spotify: 'Set up' }[x.id]}</button></div>`}</div></div>`).join('')
       + `<div class="card" style="margin-top:14px"><h3>Hey Siri, TARS (optional, after the link works)</h3><p>Talk to TARS without touching the screen, from the lock screen too. In the Shortcuts app, make a new shortcut called <b>TARS</b>:</p>
         <ol class="how"><li><b>Dictate Text</b> (Stop Listening: After Pause)</li>
         <li><b>Get Contents of URL</b>: <span style="-webkit-user-select:all;user-select:all">${esc((pcBase() || 'https://pc-name.tailnet.ts.net/car') + '/say?format=mp3')}</span>, Method POST, Request Body JSON with <b>text</b> = Dictated Text and <b>mode</b> = driving</li>
@@ -1125,12 +1268,17 @@ const SHEETS = {
       if (id === 'install') modal('Add to Home Screen', 'Open this page in Safari, tap Share (the square with the arrow), then Add to Home Screen. Open TARS from the new icon.', [{ label: 'OK', hot: true }]);
       if (id === 'check') openSheet('check');
       if (id === 'places') openSheet('places', { add: 'home' });
-      if (id === 'link') openSheet('settings');
+      if (id === 'link' || id === 'spotify') openSheet('settings');
     });
     $('#shide', B).onclick = () => { store.set('setupHidden', true); closeSheet(); };
   },
   check(B) { renderChecks(B); },
 };
+function spText() {
+  if (!pcBase()) return 'Link TARS first; Spotify goes through the PC.';
+  if (SP.connected) return `Linked ✓${SP.now && SP.now.active ? ` · ${SP.now.track}${SP.now.device && SP.now.device.name ? ' on ' + SP.now.device.name : ''}` : ''}`;
+  return SP.configured ? 'Client ID saved; finish the Spotify sign-in.' : 'Not linked. Three steps, once:';
+}
 function linkText() {
   if (!pcBase()) return 'Not linked yet.';
   if (L.ok) return `Linked ✓ ${L.rtt} ms${L.busy ? ' · TARS is busy right now' : ''}`;
@@ -1256,7 +1404,7 @@ function stopMicTest() { if (micT) { clearInterval(micT.timer); micT.stream.getT
 // ---------- life cycle ----------
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    gpsOn(); wakeOn(); tick(); linkLoop();
+    gpsOn(); wakeOn(); tick(); linkLoop(); musicSoon(SP.waitLink ? 800 : 300);
     if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
     if (pendingLink.id && Date.now() - pendingLink.at < 180000) setTimeout(askLink, 400);
   } else {
@@ -1276,6 +1424,9 @@ function demo(kind) {
   area = { lat: -33.92, lon: 18.42 };
   G.fix = { t: Date.now() + 1e9, lat: 0, lon: 0, acc: 5, spd: 54 / 3.6 }; G.moving = true; G.trip = { start: Date.now() - 23 * 60000, m: 17400, end: Date.now() };
   L.ok = true; store.set('pc', 'demo.example.ts.net');
+  Object.assign(SP, { configured: true, connected: true, at: Date.now(), now: { active: true, playing: true, track: 'Devil In A New Dress', artist: 'Kanye West, Rick Ross',
+    art: '', device: { name: 'Main iPhone' }, progress_ms: 151000, duration_ms: 351000 } });
+  musicLoop = () => {}; renderNow();
   checks = { install: { ok: true }, speaker: { ok: true }, mic: { ok: true }, gps: { ok: true } };
   if (kind === 'night') cfg.theme = 'night';
   renderTiles(); renderQuick(); renderWx(); renderSub(); renderSpeed(); renderLink(); applyTheme();
@@ -1302,7 +1453,8 @@ function demo(kind) {
   requestAnimationFrame(animate);
   const d = /#demo(?:=(\w+))?/.exec(location.hash);
   if (d) { demo(d[1] || 'idle'); return; }
-  gpsOn(); linkLoop();
+  gpsOn(); linkLoop(); musicLoop();
+  setInterval(() => { if (SP.connected && SP.now && SP.now.playing && document.visibilityState === 'visible') renderNow(); }, 1000);
   if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
   log(`opened v${VERSION}${standalone() ? ' (home screen)' : ''}${pcBase() ? ', linked' : ''}`);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => log('service worker: ' + e.message));
