@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TARS">
+<meta name="theme-color" content="#07080a">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>TARS Drive</title>
+<style>
+:root {
+  --bg: #07080a; --bg2: #0c0e11; --card: #111317; --card2: #171a1f; --line: rgba(255,255,255,.075); --line2: rgba(255,255,255,.14);
+  --ink: #f2efe8; --dim: #9aa0a7; --faint: #5d636a; --amber: #ffb547; --amber-ink: #1a1206; --ok: #55d68a; --bad: #ff6b5b; --cool: #cfe6ff;
+  --metal-a: #34383e; --metal-b: #191b1f; --face: #0a0c0e; --glow: rgba(255,181,71,.55);
+  --r: 22px; --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+html[data-theme="night"] {
+  --bg: #000; --bg2: #050202; --card: #0d0606; --card2: #140909; --line: rgba(255,120,90,.10); --line2: rgba(255,120,90,.2);
+  --ink: #ffb8a3; --dim: #b0705e; --faint: #6e3e33; --amber: #ff7b45; --amber-ink: #170500; --ok: #d98a5b; --bad: #ff5a3c; --cool: #ffb8a3;
+  --metal-a: #2a1d1a; --metal-b: #120b0a; --face: #070303; --glow: rgba(255,110,60,.5);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; touch-action: manipulation; }
+body { font: 16px/1.35 var(--sans); -webkit-user-select: none; user-select: none; -webkit-text-size-adjust: 100%;
+  transition: background-color .8s, color .8s; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, select, textarea { font: inherit; color: var(--ink); -webkit-user-select: text; user-select: text; }
+svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.mono { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+[hidden] { display: none !important; }
+
+/* ---------- home ---------- */
+#app { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 16px); }
+.top { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.top .date { color: var(--dim); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 15px; background: var(--card); border: 1px solid var(--line); font-size: 14px; font-weight: 600; white-space: nowrap; }
+.chip svg.i { width: 18px; height: 18px; }
+.chip .warn { color: var(--amber); }
+#linkdot { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: var(--card); border: 1px solid var(--line); }
+#linkdot::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--faint); box-shadow: 0 0 0 3px transparent; transition: background .3s, box-shadow .3s; }
+#linkdot.ok::after { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+#linkdot.bad::after { background: var(--bad); }
+#linkdot.busy::after { background: var(--amber); }
+
+.hero { display: flex; flex-direction: column; gap: 2px; }
+.clock { font: 200 clamp(76px, 25vw, 124px)/.86 var(--display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; margin-left: -4px; }
+.clock small { font-size: .32em; font-weight: 300; letter-spacing: 0; color: var(--dim); margin-left: .25em; vertical-align: .9em; }
+.sub { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--dim); font-size: 14px; min-height: 19px; }
+.sub b { color: var(--ink); font-weight: 600; }
+.setupbar { align-self: flex-start; margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 15px;
+  background: color-mix(in srgb, var(--amber) 14%, transparent); color: var(--amber); font-size: 13px; font-weight: 700; }
+
+/* the TARS card */
+.tars { position: relative; flex: 1 1 auto; min-height: 168px; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: 20px; row-gap: 12px; align-items: center; padding: 16px 16px 16px 20px;
+  border-radius: 28px; background: linear-gradient(160deg, var(--card2), var(--card) 60%); border: 1px solid var(--line); overflow: hidden; cursor: pointer; }
+.tars::before { content: ""; position: absolute; inset: auto -20% -60% 10%; height: 120%; background: radial-gradient(closest-side, var(--glow), transparent);
+  opacity: 0; transition: opacity .6s; pointer-events: none; }
+.tars.listening::before, .tars.speaking::before { opacity: .22; }
+.tars.thinking::before { opacity: .1; }
+.monolith { position: relative; display: flex; gap: 3px; height: clamp(116px, 21vh, 196px); aspect-ratio: .74; transition: height .35s; }
+.tars.has-action .monolith { height: clamp(96px, 14vh, 140px); }
+.slab { position: relative; flex: 1; border-radius: 4px 4px 3px 3px; overflow: hidden;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px),
+    linear-gradient(90deg, rgba(255,255,255,.10), rgba(255,255,255,0) 22%, rgba(255,255,255,0) 70%, rgba(0,0,0,.35)),
+    linear-gradient(180deg, var(--metal-a), var(--metal-b));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 10px 22px rgba(0,0,0,.55); transition: transform .5s cubic-bezier(.3,.7,.3,1); }
+.slab i { position: absolute; left: 50%; bottom: 7%; width: 3px; height: 46%; margin-left: -1.5px; border-radius: 2px; background: var(--amber);
+  transform-origin: 50% 100%; transform: scaleY(var(--lv, .12)); opacity: calc(.25 + var(--lv, .12) * .75);
+  box-shadow: 0 0 10px var(--glow); }
+.tars.speaking .slab i { background: var(--cool); box-shadow: 0 0 10px rgba(207,230,255,.55); }
+html[data-theme="night"] .tars.speaking .slab i { background: var(--ink); }
+.face { position: absolute; left: 22%; right: 22%; top: 13%; height: 17%; min-height: 20px; border-radius: 3px; background: var(--face);
+  border: 1px solid rgba(255,255,255,.09); display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 8%; overflow: hidden; }
+.face b { display: block; height: 2px; border-radius: 1px; background: var(--ink); opacity: .85; transition: width .4s; }
+.face b:nth-child(1) { width: 70%; } .face b:nth-child(2) { width: 42%; opacity: .55; }
+.tars.listening .face b { background: var(--amber); }
+.tars.thinking .face b:nth-child(1) { animation: scan 1.1s ease-in-out infinite; }
+.tars.thinking .face b:nth-child(2) { animation: scan 1.1s ease-in-out -.55s infinite; }
+@keyframes scan { 0%,100% { width: 18%; } 50% { width: 82%; } }
+.tars.thinking .slab { animation: walk 1.3s ease-in-out infinite; }
+.tars.thinking .slab:nth-child(2) { animation-delay: .12s; } .tars.thinking .slab:nth-child(3) { animation-delay: .24s; } .tars.thinking .slab:nth-child(4) { animation-delay: .36s; }
+@keyframes walk { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.tars.error .face b { background: var(--bad); }
+
+.readout { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.status { color: var(--dim); display: flex; align-items: center; gap: 8px; }
+.status .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.tars.listening .status { color: var(--amber); } .tars.listening .status .pip { background: var(--amber); animation: blink 1s steps(2) infinite; }
+.tars.thinking .status .pip { background: var(--ink); animation: blink .6s steps(2) infinite; }
+.tars.speaking .status { color: var(--ink); } .tars.speaking .status .pip { background: var(--cool); }
+.tars.error .status { color: var(--bad); } .tars.error .status .pip { background: var(--bad); }
+@keyframes blink { 50% { opacity: .2; } }
+.said { color: var(--dim); font-size: 15px; line-height: 1.3; max-height: 2.6em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.said:empty { display: none; }
+.reply { font: 500 clamp(19px, 5.4vw, 24px)/1.28 var(--display); letter-spacing: -.01em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.reply.hint { color: var(--dim); font-weight: 400; }
+.reply.err { color: var(--bad); }
+.reply span { transition: opacity .35s, color .35s; }
+.reply span.pending { opacity: .45; }
+.reply span.now { color: var(--ink); }
+.action { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 20px; background: var(--bg2); border: 1px solid var(--line2);
+  animation: rise .35s cubic-bezier(.2,.8,.3,1); cursor: default; }
+@keyframes rise { from { transform: translateY(8px); opacity: 0; } }
+.action .what { flex: 1; min-width: 0; }
+.action .what div:first-child { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.action .what div:last-child { color: var(--dim); font-size: 13px; }
+.action .go { height: 52px; min-width: 88px; padding: 0 18px; border-radius: 15px; background: var(--amber); color: var(--amber-ink); font-weight: 800; font-size: 17px; letter-spacing: .04em; }
+.action .x { width: 40px; height: 52px; display: grid; place-items: center; color: var(--dim); }
+.action .alt { height: 52px; padding: 0 12px; border-radius: 15px; background: var(--card2); font-weight: 600; font-size: 14px; }
+
+.quick { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-16px - env(safe-area-inset-right)) 0 calc(-16px - env(safe-area-inset-left));
+  padding: 0 calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)); -webkit-overflow-scrolling: touch; flex: none; }
+.quick::-webkit-scrollbar { display: none; }
+.quick button { flex: none; height: 44px; padding: 0 16px; border-radius: 22px; background: var(--card); border: 1px solid var(--line); font-weight: 600; font-size: 15px; white-space: nowrap; }
+.quick button:disabled { opacity: .4; }
+
+.group { display: flex; flex-direction: column; gap: 7px; flex: none; }
+.group .label { color: var(--faint); padding-left: 4px; }
+.group .label span { color: var(--faint); opacity: .8; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 64px; gap: 8px; }
+.tile { position: relative; height: 82px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between;
+  align-items: flex-start; padding: 11px 11px 10px; text-align: left; overflow: hidden; transition: transform .12s, background .2s; }
+.tile:active, .quick button:active, .chip:active, .btn:active, .action .go:active { transform: scale(.96); }
+.tile svg.i { width: 24px; height: 24px; }
+.tile .n { font-weight: 700; font-size: 15px; line-height: 1.15; width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.tile.more { align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; text-align: center; }
+.tile.more .n { font-size: 11px; font-weight: 600; color: var(--dim); text-align: center; -webkit-line-clamp: 1; }
+.tile .s { font-size: 11px; color: var(--dim); width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.ghost { background: transparent; border-style: dashed; border-color: var(--line2); color: var(--dim); }
+.tile.hot svg.i { color: var(--amber); }
+
+.bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; flex: none; }
+.drive, .menu { display: flex; align-items: center; gap: 10px; }
+.speed { display: flex; align-items: baseline; gap: 5px; min-width: 76px; }
+.speed b { font: 300 34px/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.speed span { color: var(--dim); font-size: 12px; }
+#mode { height: 30px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line2); color: var(--dim); }
+#mode.driving { color: var(--amber-ink); background: var(--amber); border-color: transparent; }
+.iconbtn { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; background: var(--card); border: 1px solid var(--line); color: var(--dim); }
+
+/* landscape on a phone: clock | TARS | tiles */
+@media (orientation: landscape) and (max-height: 520px) {
+  #app { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: 14px; row-gap: 8px; padding-top: calc(env(safe-area-inset-top) + 6px); }
+  .top { grid-column: 1 / -1; grid-row: 1; min-height: 28px; }
+  .hero { grid-column: 1; grid-row: 2; align-self: center; }
+  .clock { font-size: clamp(58px, 10vw, 100px); }
+  .sub { font-size: 13px; }
+  .tars { grid-column: 2; grid-row: 2; min-height: 0; padding: 12px 12px 12px 14px; column-gap: 14px; }
+  .monolith, .tars.has-action .monolith { height: clamp(76px, 24vh, 120px); }
+  .reply { -webkit-line-clamp: 3; font-size: 18px; }
+  .said { font-size: 13px; }
+  .action { padding: 6px 6px 6px 12px; }
+  .action .go, .action .alt, .action .x { height: 44px; }
+  .quick { grid-column: 2; grid-row: 3; margin: 0; padding: 0; }
+  .quick button { height: 40px; font-size: 13px; padding: 0 13px; }
+  .groups { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 0; }
+  .group { gap: 4px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .tile, .tile.more { height: 46px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 0 10px; border-radius: 15px; text-align: left; }
+  .tile svg.i { width: 20px; height: 20px; }
+  .tile .s { display: none; }
+  .tile .n, .tile.more .n { font-size: 13px; -webkit-line-clamp: 1; color: inherit; text-align: left; font-weight: 700; }
+  .bottom { display: contents; }
+  .drive { grid-column: 1; grid-row: 3; }
+  .menu { grid-column: 3; grid-row: 3; justify-content: flex-end; gap: 8px; }
+  .iconbtn { width: 40px; height: 40px; border-radius: 13px; }
+  .speed b { font-size: 26px; }
+  .setupbar { margin-top: 6px; }
+}
+@media (orientation: portrait), (min-height: 521px) { .groups { display: contents; } }
+
+/* ---------- sheets ---------- */
+.sheet { position: fixed; inset: 0; z-index: 10; background: var(--bg); display: flex; flex-direction: column; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); visibility: hidden; }
+.sheet.on { transform: none; visibility: visible; }
+.sheet header { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 16px) 10px calc(env(safe-area-inset-left) + 16px); border-bottom: 1px solid var(--line); }
+.sheet header h2 { margin: 0; flex: 1; font: 700 22px/1.2 var(--display); letter-spacing: -.01em; }
+.sheet .body { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 14px calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 40px) calc(env(safe-area-inset-left) + 16px); -webkit-user-select: text; user-select: text; }
+.btn { height: 46px; padding: 0 18px; border-radius: 14px; background: var(--card2); border: 1px solid var(--line); font-weight: 650; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn.hot { background: var(--amber); color: var(--amber-ink); border-color: transparent; }
+.btn.small { height: 36px; padding: 0 12px; border-radius: 11px; font-size: 14px; }
+.btn.danger { color: var(--bad); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 14px; margin-bottom: 12px; }
+.card h3 { margin: 0 0 4px; font-size: 17px; }
+.card p, .note { margin: 4px 0 0; color: var(--dim); font-size: 14px; line-height: 1.45; }
+.row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row .grow { flex: 1; min-width: 0; }
+.row .t { font-weight: 650; }
+.row .s { color: var(--dim); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.field { display: block; width: 100%; height: 46px; margin-top: 8px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line2); background: var(--bg2); }
+textarea.field { height: auto; min-height: 64px; padding: 10px 12px; resize: vertical; }
+select.field { -webkit-appearance: none; appearance: none; }
+.seg { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.seg button { flex: 1; min-width: 70px; height: 40px; border-radius: 11px; background: var(--bg2); border: 1px solid var(--line2); font-weight: 600; font-size: 14px; }
+.seg button.on { background: var(--amber); color: var(--amber-ink); border-color: transparent; }
+input[type=range] { width: 100%; margin-top: 12px; accent-color: var(--amber); }
+.badge { display: inline-block; min-width: 54px; text-align: center; padding: 3px 8px; border-radius: 8px; font: 700 11px/1.4 var(--mono); letter-spacing: .08em; background: var(--card2); color: var(--dim); }
+.badge.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.badge.bad { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.step { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.step .num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--card2); font-weight: 700; font-size: 14px; }
+.step.done .num { background: var(--ok); color: #04150b; }
+.step .grow { flex: 1; min-width: 0; }
+ol.how { margin: 8px 0 0; padding-left: 20px; color: var(--dim); font-size: 14px; line-height: 1.5; }
+ol.how b { color: var(--ink); }
+.meter { height: 8px; border-radius: 4px; background: var(--bg2); overflow: hidden; margin-top: 10px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--amber); transition: width .08s; }
+.empty { color: var(--dim); text-align: center; padding: 26px 10px; }
+.hist .q { color: var(--dim); font-size: 14px; }
+.hist .a { margin-top: 4px; }
+.hist .m { color: var(--faint); font: 600 11px var(--mono); letter-spacing: .08em; margin-top: 6px; }
+
+#toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 84px); transform: translate(-50%, 20px); z-index: 30; max-width: 88vw; padding: 12px 18px; border-radius: 16px;
+  background: rgba(20,22,26,.94); border: 1px solid var(--line2); font-weight: 600; font-size: 15px; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+html[data-theme="night"] #toast { background: rgba(20,8,6,.94); }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+#modal { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 24px; }
+#modal .box { width: min(420px, 100%); background: var(--card); border: 1px solid var(--line2); border-radius: 24px; padding: 20px; }
+#modal h3 { margin: 0 0 6px; font-size: 19px; }
+#modal p { margin: 0; color: var(--dim); }
+#modal .acts { margin-top: 16px; }
+#modal .acts .btn { flex: 1; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></symbol>
+  <symbol id="i-work" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18"/></symbol>
+  <symbol id="i-gym" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18.5" cy="12" r="1.2"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5Z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6M3.5 4v4.5H8"/><path d="M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.3 3 8 7 9.5 4-1.5 7-5.2 7-9.5V6Z"/><path d="m9 12 2.2 2.2L15.5 10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6 1.6A3.3 3.3 0 0 0 7 18.5Z"/></symbol>
+  <symbol id="i-pcloud" viewBox="0 0 24 24"><path d="M8 4.5v1.5M3.5 9H5M4.8 5.8l1 1M12.3 6.3l-1 1"/><path d="M5.6 11.6A3.6 3.6 0 0 1 11 8.6"/><path d="M8 19.5h9.5a3.6 3.6 0 0 0 .4-7.2 5.4 5.4 0 0 0-10.4 1.4A3 3 0 0 0 8 19.5Z"/></symbol>
+  <symbol id="i-rain" viewBox="0 0 24 24"><path d="M7 15.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6 1.6A3.3 3.3 0 0 0 7 15.5Z"/><path d="M8.5 18.5 7.5 21M12.5 18.5l-1 2.5M16.5 18.5l-1 2.5"/></symbol>
+  <symbol id="i-storm" viewBox="0 0 24 24"><path d="M7 15.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6 1.6A3.3 3.3 0 0 0 7 15.5Z"/><path d="m12.5 15-2 3.5h3l-2 3.5"/></symbol>
+  <symbol id="i-fog" viewBox="0 0 24 24"><path d="M4 9h16M3 13h18M5 17h14"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7 2.5 2.5 7Z"/><path d="m21 3-11 10"/></symbol>
+  <symbol id="i-loc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="m16 10.5 5-3v9l-5-3"/></symbol>
+</svg>
+
+<div id="app">
+  <div class="top">
+    <div class="date mono" id="date"></div>
+    <button class="chip" id="wx" hidden></button>
+    <button id="linkdot" aria-label="TARS link"></button>
+  </div>
+
+  <section class="hero">
+    <div class="clock" id="clock">--:--</div>
+    <div class="sub" id="sub"></div>
+    <button class="setupbar" id="setupbar" hidden></button>
+  </section>
+
+  <section class="tars" id="tars" aria-label="Talk to TARS">
+    <div class="monolith" id="monolith" aria-hidden="true">
+      <span class="slab"><i></i></span><span class="slab"><i></i></span><span class="slab"><i></i></span><span class="slab"><i></i></span>
+      <span class="face"><b></b><b></b></span>
+    </div>
+    <div class="readout">
+      <div class="status mono"><span class="pip"></span><span id="status">TARS</span></div>
+      <div class="said" id="said"></div>
+      <div class="reply hint" id="reply">Tap TARS and talk.</div>
+    </div>
+    <div class="action" id="action" hidden></div>
+  </section>
+
+  <nav class="quick" id="quick" aria-label="Quick asks"></nav>
+
+  <div class="groups">
+    <section class="group"><div class="label mono">Go <span id="mapsname"></span></div><div class="tiles" id="gotiles"></div></section>
+    <section class="group"><div class="label mono">Music</div><div class="tiles" id="musictiles"></div></section>
+  </div>
+
+  <div class="bottom">
+    <div class="drive"><div class="speed"><b id="spd">–</b><span>km/h</span></div><button id="mode" class="mono">No GPS</button></div>
+    <div class="menu">
+      <button class="iconbtn" data-open="history" aria-label="History"><svg class="i"><use href="#i-hist"/></svg></button>
+      <button class="iconbtn" data-open="check" aria-label="Check this phone"><svg class="i"><use href="#i-check"/></svg></button>
+      <button class="iconbtn" data-open="settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<section class="sheet" id="sheet" aria-modal="true">
+  <header><h2 id="sheettitle"></h2><button class="btn small" id="sheetdone">Done</button></header>
+  <div class="body" id="sheetbody"></div>
+</section>
+<div id="modal" hidden><div class="box"><h3 id="mtitle"></h3><p id="mtext"></p><div class="acts" id="macts"></div></div></div>
+<div id="toast"></div>
+<audio id="voice" preload="auto"></audio>
+
+<script>
+'use strict';
+// TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
+// Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
+// speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
+const VERSION = '1.0.0';
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const two = n => String(n).padStart(2, '0');
+const hm = d => `${two(d.getHours())}:${two(d.getMinutes())}`;
+const icon = (id, cls = 'i') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('drive.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('drive.' + k, JSON.stringify(v)); } catch {} },
+};
+const LOG = [];
+function log(m) { LOG.push(`${hm(new Date())}:${two(new Date().getSeconds())} ${m}`); if (LOG.length > 300) LOG.splice(0, 100); }
+window.addEventListener('error', e => log('JS error: ' + e.message));
+window.addEventListener('unhandledrejection', e => log('JS rejection: ' + (e.reason && e.reason.message || e.reason)));
+
+// ---------- settings and saved things ----------
+const DEFAULT_CFG = { humor: 75, voice: true, maps: 'google', theme: 'auto', tg: '', link: { google: 'app', waze: 'app', apple: 'web', spotify: 'app' } };
+const DEFAULT_QUICK = [
+  { label: 'Drive home?', text: 'How long is the drive home right now?' },
+  { label: "Who's waiting?", text: "Who's waiting on me on WhatsApp?" },
+  { label: 'DJ me', text: 'Make me a Spotify playlist for this drive, from my taste and the time of day.' },
+  { label: 'My last drive', text: 'How was my last drive?' },
+  { label: 'Brief me', text: 'Brief me.' },
+  { label: "What's playing?", text: "What's playing on my Spotify right now?" },
+];
+const cfg = Object.assign({}, DEFAULT_CFG, store.get('cfg', {}));
+cfg.link = Object.assign({}, DEFAULT_CFG.link, cfg.link || {});
+let places = store.get('places', []);        // {id, name, kind, lat, lon, q}
+let music = store.get('music', []);          // pinned {id, name, url}
+let fromTars = store.get('fromtars', []);    // playlists TARS sent {url, name, at}
+let quick = store.get('quick', DEFAULT_QUICK);
+let convos = store.get('history', []);
+let checks = store.get('checks', {});        // id -> {ok, detail, at}
+const saveCfg = () => store.set('cfg', cfg);
+const KIND = { home: { icon: 'home', label: 'Home' }, work: { icon: 'work', label: 'Work' }, gym: { icon: 'gym', label: 'Gym' }, other: { icon: 'pin', label: 'Place' } };
+const APPNAME = { google: 'Google Maps', waze: 'Waze', apple: 'Apple Maps' };
+const SYN = { home: ['home', 'house', 'my place'], work: ['work', 'office', 'job'], gym: ['gym'] };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// ---------- theme, clock, sun ----------
+function sunTimes(date, lat, lon, alt = -0.833) {           // from Trail Companion
+  const rad = Math.PI / 180, jd0 = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 864e5 + 2440587.5;
+  const n = Math.ceil(jd0 - 2451545.0 + 0.0008), Js = n - lon / 360;
+  const M = (357.5291 + 0.98560028 * Js) % 360, Cc = 1.9148 * Math.sin(M * rad) + 0.02 * Math.sin(2 * M * rad) + 0.0003 * Math.sin(3 * M * rad);
+  const lam = (M + Cc + 180 + 102.9372) % 360, Jt = 2451545.0 + Js + 0.0053 * Math.sin(M * rad) - 0.0069 * Math.sin(2 * lam * rad);
+  const sd = Math.sin(lam * rad) * Math.sin(23.4397 * rad), cd = Math.cos(Math.asin(sd));
+  const cw = (Math.sin(alt * rad) - Math.sin(lat * rad) * sd) / (Math.cos(lat * rad) * cd), w = Math.acos(clamp(cw, -1, 1)) * 180 / Math.PI;
+  const toD = j => new Date((j - 2440587.5) * 864e5); return { rise: toD(Jt - w / 360), set: toD(Jt + w / 360) };
+}
+let area = store.get('area', null);          // last location rounded to ~1 km, only for sunset and weather
+function sunNow() {
+  if (!area) return null;
+  const now = new Date(), t = sunTimes(now, area.lat, area.lon), tm = sunTimes(new Date(now.getTime() + 864e5), area.lat, area.lon);
+  const night = now < t.rise || now > t.set;
+  const next = now < t.rise ? { k: 'Sunrise', at: t.rise } : now < t.set ? { k: 'Sunset', at: t.set } : { k: 'Sunrise', at: tm.rise };
+  return { night, next };
+}
+function applyTheme() {
+  const s = sunNow();
+  const night = cfg.theme === 'night' || (cfg.theme === 'auto' && s && s.night);
+  const want = night ? 'night' : 'day';
+  if (document.documentElement.dataset.theme !== want) document.documentElement.dataset.theme = want;
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = night ? '#000000' : '#07080a';
+}
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+let lastMinute = -1;
+function tick() {
+  const now = new Date();
+  if (now.getMinutes() !== lastMinute) {
+    lastMinute = now.getMinutes();
+    $('#clock').textContent = hm(now);
+    $('#date').textContent = `${DAYS[now.getDay()]} ${now.getDate()} ${MONTHS[now.getMonth()]}`;
+    renderSub(); applyTheme();
+  }
+  renderSpeed();
+}
+function dur(ms) { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${two(m % 60)}`; }
+function renderSub() {
+  const parts = [], s = sunNow(), t = G.trip;
+  if (t && Date.now() - t.end < 180000 && t.end - t.start > 60000) parts.push(`Trip <b>${dur(t.end - t.start)}</b> · ${(t.m / 1000).toFixed(1)} km`);
+  if (s) { const left = s.next.at - Date.now(); parts.push(`${s.next.k} <b>${hm(s.next.at)}</b>${left < 3 * 3600e3 ? ' · in ' + dur(left) : ''}`); }
+  if (WX.now) {
+    const r = WX.now.rainAt;
+    if (r) parts.push(r === 'now' ? '<b>Raining</b>' : `Rain likely from <b>${r}</b>`);
+  }
+  $('#sub').innerHTML = parts.join('<span>·</span>') || '&nbsp;';
+}
+
+// ---------- GPS: speed, driving or parked, trip ----------
+const G = { id: null, fix: null, prev: null, moving: false, fastSince: 0, slowSince: 0, trip: null, manual: null, denied: false };
+function gpsOn() {
+  if (G.id !== null || !navigator.geolocation) return;
+  G.id = navigator.geolocation.watchPosition(onFix, e => { if (e.code === 1) G.denied = true; log('GPS error ' + e.code + ' ' + e.message); renderSpeed(); },
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 });
+}
+function gpsOff() { if (G.id !== null) navigator.geolocation.clearWatch(G.id); G.id = null; }
+function dist(a, b) {
+  const R = 6371000, r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function onFix(p) {
+  const c = p.coords, f = { t: Date.now(), lat: c.latitude, lon: c.longitude, acc: c.accuracy, spd: c.speed != null && c.speed >= 0 ? c.speed : null };
+  G.denied = false;
+  if (f.spd == null && G.fix && f.acc < 30 && G.fix.acc < 30 && f.t > G.fix.t) f.spd = dist(G.fix, f) / ((f.t - G.fix.t) / 1000);
+  if (G.trip && G.fix && f.acc < 35 && G.fix.acc < 35) { const d = dist(G.fix, f); if (d < 400) G.trip.m += d; }
+  G.prev = G.fix; G.fix = f;
+  const kmh = (f.spd || 0) * 3.6, now = f.t;
+  if (kmh >= 15) { G.fastSince = G.fastSince || now; G.slowSince = 0; } else { G.fastSince = 0; if (kmh < 5) G.slowSince = G.slowSince || now; else G.slowSince = 0; }
+  if (!G.moving && G.fastSince && now - G.fastSince > 5000) { G.moving = true; if (!G.trip || now - G.trip.end > 180000) G.trip = { start: now, m: 0, end: now }; log('driving'); }
+  if (G.moving && G.slowSince && now - G.slowSince > 60000) { G.moving = false; log('parked'); }
+  if (G.trip && G.moving) { G.trip.end = now; if (now - (G.subAt || 0) > 30000) { G.subAt = now; renderSub(); } }
+  if (f.acc < 3000) {
+    const a = { lat: Math.round(f.lat * 100) / 100, lon: Math.round(f.lon * 100) / 100 };   // ~1 km: enough for sun and weather
+    if (!area || area.lat !== a.lat || area.lon !== a.lon) { area = a; store.set('area', a); renderSub(); applyTheme(); }
+    if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
+  }
+  renderSpeed();
+}
+const fresh = () => G.fix && Date.now() - G.fix.t < 8000;
+function mode() {                                    // what TARS is told: unknown counts as driving (short replies)
+  if (fresh()) return G.moving ? 'driving' : 'parked';
+  return G.manual || 'driving';
+}
+const driving = () => fresh() && G.moving;
+function renderSpeed() {
+  const f = G.fix, ok = fresh() && f.spd != null;
+  $('#spd').textContent = ok ? Math.round(f.spd * 3.6) : '–';
+  const m = $('#mode');
+  if (fresh()) { m.textContent = G.moving ? 'Driving' : 'Parked'; m.className = 'mono' + (G.moving ? ' driving' : ''); }
+  else { m.textContent = G.manual ? (G.manual === 'parked' ? 'Parked' : 'Driving') + ' *' : (G.denied ? 'GPS off' : 'No GPS'); m.className = 'mono' + (G.manual === 'driving' ? ' driving' : ''); }
+}
+
+// ---------- weather (Open-Meteo, no key; the location is rounded to ~1 km) ----------
+const WX = store.get('wx', { at: 0, now: null });
+const WMO = c => c === 0 ? ['sun', 'Clear'] : c <= 2 ? ['pcloud', c === 1 ? 'Mostly clear' : 'Partly cloudy'] : c === 3 ? ['cloud', 'Overcast']
+  : c <= 48 ? ['fog', 'Fog'] : c <= 67 || (c >= 80 && c <= 82) ? ['rain', c >= 80 ? 'Showers' : c <= 57 ? 'Drizzle' : 'Rain'] : c <= 77 ? ['cloud', 'Snow'] : ['storm', 'Thunderstorms'];
+let wxBusy = false;
+async function weather() {
+  if (wxBusy || !area || !navigator.onLine) return;
+  wxBusy = true;
+  try {
+    const q = `latitude=${area.lat}&longitude=${area.lon}&timezone=auto&current=temperature_2m,weather_code,is_day,precipitation&minutely_15=precipitation&forecast_minutely_15=8&hourly=precipitation_probability&forecast_hours=3`;
+    const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?' + q, { signal: ctl.signal });
+    clearTimeout(tm);
+    const d = await r.json(), c = d.current;
+    let rainAt = c.precipitation > 0.05 ? 'now' : null;
+    if (!rainAt && d.minutely_15) {
+      const i = d.minutely_15.precipitation.findIndex(p => p >= 0.2);
+      if (i >= 0) rainAt = d.minutely_15.time[i].slice(11, 16);
+    }
+    if (!rainAt && d.hourly) { const i = d.hourly.precipitation_probability.findIndex(p => p >= 60); if (i >= 0) rainAt = d.hourly.time[i].slice(11, 16); }
+    WX.now = { temp: Math.round(c.temperature_2m), code: c.weather_code, day: c.is_day, rainAt };
+    WX.at = Date.now(); store.set('wx', WX);
+  } catch (e) { log('weather: ' + e.message); }
+  finally { wxBusy = false; renderWx(); renderSub(); }
+}
+function renderWx() {
+  const w = WX.now, b = $('#wx');
+  if (!w || Date.now() - WX.at > 3 * 3600e3) { b.hidden = true; return; }
+  let [ic] = WMO(w.code); if (ic === 'sun' && !w.day) ic = 'moon';
+  b.hidden = false;
+  b.innerHTML = `${icon(ic)}<span>${w.temp}°</span>${w.rainAt ? `<span class="warn">${icon('rain')}</span>` : ''}`;
+}
+
+// ---------- keep the screen on ----------
+let wake = null;
+async function wakeOn() {
+  if (!('wakeLock' in navigator) || wake || document.visibilityState !== 'visible') return;
+  try { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } catch (e) { log('wake lock: ' + e.message); }
+}
+
+// ---------- the link to TARS (the PC, over Tailscale) ----------
+const L = { ok: null, rtt: 0, err: '', busy: false, timer: 0 };
+const pcRaw = () => store.get('pc', '');
+function pcBase() {
+  let u = String(pcRaw() || '').trim(); if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  u = u.replace(/\/+$/, ''); if (!/\/car$/.test(u)) u += '/car';
+  return u;
+}
+async function hello(timeout = 8000) {
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), timeout), t0 = performance.now();
+  try {
+    const r = await fetch(`${pcBase()}/hello?v=${VERSION}`, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) throw new Error(r.status === 403 ? 'the PC refused this phone (Tailscale sign-in?)' : 'PC said ' + r.status);
+    const j = await r.json();
+    Object.assign(L, { ok: true, rtt: Math.round(performance.now() - t0), err: '', busy: !!j.busy });
+    if (!checks.pc || !checks.pc.ok) setCheck('pc', true, `${L.rtt} ms`);
+    return j;
+  } catch (e) {
+    Object.assign(L, { ok: false, err: e.name === 'AbortError' ? 'timed out' : e instanceof TypeError ? "can't reach it" : e.message });
+    throw e;
+  } finally { clearTimeout(tm); renderLink(); }
+}
+async function linkLoop() {
+  clearTimeout(L.timer);
+  if (pcBase() && document.visibilityState === 'visible' && T.st === 'idle') { try { await hello(); } catch {} }
+  else renderLink();
+  L.timer = setTimeout(linkLoop, L.ok ? 60000 : 20000);
+}
+function renderLink() {
+  const d = $('#linkdot');
+  d.className = !pcBase() ? '' : L.ok === null ? 'busy' : L.ok ? (L.busy ? 'busy' : 'ok') : 'bad';
+  renderSetupBar();
+}
+
+// ---------- opening other apps ----------
+function openExternal(url) {
+  log('open ' + url.replace(/\?.*/, ''));
+  if (/^https?:/i.test(url)) { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+  else location.href = url;
+}
+function mapsLink(app, method, dest) {
+  const ll = dest.lat != null ? `${(+dest.lat).toFixed(6)},${(+dest.lon).toFixed(6)}` : null;
+  const q = encodeURIComponent(ll || dest.q || dest.label || '');
+  if (app === 'waze') {
+    const base = method === 'app' ? 'waze://' : 'https://waze.com/ul';
+    return ll ? `${base}?ll=${ll}&navigate=yes` : `${base}?q=${q}&navigate=yes`;
+  }
+  if (app === 'apple') return method === 'app' ? `maps://?daddr=${q}&dirflg=d` : `https://maps.apple.com/?daddr=${q}&dirflg=d`;
+  return method === 'app' ? `comgooglemaps://?daddr=${q}&directionsmode=driving` : `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving&dir_action=navigate`;
+}
+function spotifyLink(url, method) {
+  const m = (url || '').match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(playlist|album|track|artist|show|episode)\/([A-Za-z0-9]+)/);
+  const u = (url || '').match(/^spotify:([a-z]+):([A-Za-z0-9]+)$/);
+  const kind = m ? m[1] : u ? u[1] : null, id = m ? m[2] : u ? u[2] : null;
+  if (method === 'app') return kind ? `spotify:${kind}:${id}` : 'spotify:';
+  return kind ? `https://open.spotify.com/${kind}/${id}` : 'https://open.spotify.com/';
+}
+const norm = s => String(s || '').toLowerCase().replace(/[^\w\s']/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(the|my) /, '');
+function findPlace(name) {
+  const d = norm(name);
+  if (!d) return null;
+  return places.find(p => norm(p.name) === d)
+    || places.find(p => (SYN[p.kind] || []).includes(d) || p.kind === d)
+    || (d.length >= 4 ? places.find(p => norm(p.name).includes(d) || d.includes(norm(p.name))) : null) || null;
+}
+const destOf = p => p.lat != null ? { lat: p.lat, lon: p.lon, label: p.name } : { q: p.q || p.name, label: p.name };
+function goPlace(p) { openExternal(mapsLink(cfg.maps, cfg.link[cfg.maps] || 'app', destOf(p))); }
+function goQuery(q) { openExternal(mapsLink(cfg.maps, cfg.link[cfg.maps] || 'app', { q, label: q })); }
+function playUrl(url) { openExternal(spotifyLink(url, cfg.link.spotify)); }
+function openTelegram() { openExternal(cfg.tg ? `tg://resolve?domain=${encodeURIComponent(cfg.tg.replace(/^@/, ''))}` : 'tg://'); }
+
+// ---------- TARS: listen, send, speak ----------
+const voiceEl = $('#voice');
+const T = { st: 'idle', rec: null, stream: null, chunks: [], ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null,
+  aboveSince: 0, quietSince: 0, heard: false, anyAudio: false, vadOk: true, level: 0, vadTimer: 0, abort: null, turn: null, endReason: '' };
+const V = { q: [], cur: null };
+const STATUS = { idle: 'TARS', arming: 'Microphone', listening: 'Listening', sending: 'Sending', thinking: 'Thinking', speaking: 'TARS', error: 'TARS' };
+function setState(st, status) {
+  T.st = st;
+  const card = $('#tars');
+  card.className = 'tars ' + (st === 'arming' || st === 'sending' ? (st === 'arming' ? 'listening' : 'thinking') : st) + ($('#action').hidden ? '' : ' has-action');
+  $('#status').textContent = status || (st === 'idle' ? `TARS · humor ${cfg.humor}%` : STATUS[st]);
+  document.querySelectorAll('#quick button').forEach(b => { b.disabled = st !== 'idle' && st !== 'error'; });
+}
+function setReply(html, cls = '') { const r = $('#reply'); r.className = 'reply ' + cls; r.innerHTML = html; }
+function unlockAudio() {
+  // Inside the tap: iOS only lets this element play later (when TARS answers) if it played once from a touch.
+  try { voiceEl.src = 'silence.mp3'; const p = voiceEl.play(); if (p) p.catch(() => {}); } catch {}
+  try { if (!T.ctx) T.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (T.ctx.state !== 'running') T.ctx.resume().catch(() => {}); } catch {}
+  try { if (window.speechSynthesis && !T.ttsPrimed) { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); T.ttsPrimed = true; } } catch {}
+}
+function speakLocal(text) {                        // only for "can't reach the PC" and the like, while driving
+  if (!cfg.voice || mode() !== 'driving') return;
+  try { const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch {}
+}
+function onTarsTap(e) {
+  if (e && e.target.closest('.action')) return;
+  wakeOn();
+  if (T.st === 'speaking') { stopVoice(); setState('idle'); markAll('spoken'); return; }
+  if (T.st === 'listening') { endListening('tap'); return; }
+  if (T.st === 'thinking' || T.st === 'sending') { cancelTurn(); return; }
+  if (T.st === 'arming') return;
+  unlockAudio();
+  if (!pcBase()) { notLinked(); return; }
+  startListening();
+}
+function pickAudioMime() {
+  if (!window.MediaRecorder) return null;
+  for (const m of ['audio/mp4', 'audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'])
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch {}
+  return '';
+}
+async function startListening() {
+  stopVoice(); clearAction();
+  setState('arming');
+  $('#said').textContent = ''; setReply('Listening…', 'hint');
+  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch {}
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+  } catch (e) {
+    log('mic: ' + e.name + ' ' + e.message);
+    return failLocal(e.name === 'NotAllowedError' ? 'The microphone is blocked. Allow it for this app, then tap TARS again.' : `The microphone didn't start (${e.name}).`);
+  }
+  const mime = pickAudioMime();
+  if (mime === null) { stream.getTracks().forEach(t => t.stop()); return failLocal("This phone can't record audio in the browser."); }
+  T.stream = stream;
+  try { T.rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined); }
+  catch { try { T.rec = new MediaRecorder(stream); } catch (e) { stopMic(); return failLocal('The recorder would not start: ' + e.name); } }
+  T.chunks = [];
+  T.rec.ondataavailable = ev => { if (ev.data && ev.data.size) T.chunks.push(ev.data); };
+  T.rec.onstop = onRecorded;
+  try { T.rec.start(250); } catch (e) { stopMic(); return failLocal('The recorder would not start: ' + e.name); }
+  T.an = null;
+  try {
+    if (T.ctx) {
+      T.srcNode = T.ctx.createMediaStreamSource(stream);
+      T.an = T.ctx.createAnalyser(); T.an.fftSize = 1024; T.buf = new Float32Array(T.an.fftSize);
+      T.srcNode.connect(T.an);
+    }
+  } catch (e) { log('level meter: ' + e.message); T.an = null; }
+  Object.assign(T, { t0: performance.now(), cal: [], floor: null, aboveSince: 0, quietSince: 0, heard: false, anyAudio: false, vadOk: !!T.an, endReason: '', level: 0 });
+  setState('listening', T.an ? 'Listening' : 'Listening · tap when done');
+  setReply(T.an ? 'Go ahead. I stop when you do.' : 'Go ahead, then tap TARS when you’re done.', 'hint');
+  clearInterval(T.vadTimer); T.vadTimer = setInterval(vadTick, 50);
+}
+function vadTick() {
+  if (T.st !== 'listening') return;
+  const now = performance.now(), el = now - T.t0;
+  let db = -100;
+  if (T.an) {
+    T.an.getFloatTimeDomainData(T.buf);
+    let s = 0, pk = 0;
+    for (let i = 0; i < T.buf.length; i++) { const x = T.buf[i]; s += x * x; const a = x < 0 ? -x : x; if (a > pk) pk = a; }
+    db = 20 * Math.log10(Math.sqrt(s / T.buf.length) + 1e-9);
+    if (pk > 0) T.anyAudio = true;
+  }
+  T.level = clamp((db + 58) / 38, 0, 1);
+  if (T.vadOk && el > 1000 && !T.anyAudio) {          // the meter only reads zeros: iOS kept it asleep. Fall back to tap-to-finish.
+    T.vadOk = false; log('voice detector unavailable, tap to finish');
+    $('#status').textContent = 'Listening · tap when done'; setReply('Go ahead, then tap TARS when you’re done.', 'hint');
+  }
+  const maxMs = mode() === 'driving' ? 15000 : 30000;
+  if (el > maxMs) return endListening('max');
+  if (!T.vadOk) return;
+  if (el < 300) { T.cal.push(db); return; }
+  if (T.floor == null) { const c = T.cal.slice().sort((a, b) => a - b); T.floor = clamp(c.length ? c[c.length >> 1] : -60, -80, -38); }
+  const on = Math.max(T.floor + 12, -50), off = Math.max(T.floor + 7, -55);
+  if (db > on) { T.aboveSince = T.aboveSince || now; if (!T.heard && now - T.aboveSince > 120) T.heard = true; T.quietSince = 0; }
+  else { T.aboveSince = 0; T.quietSince = db < off ? (T.quietSince || now) : 0; if (!T.heard) T.floor = T.floor * 0.97 + db * 0.03; }
+  if (T.heard && T.quietSince && now - T.quietSince > 1100) return endListening('pause');
+  if (!T.heard && el > 7000) return endListening('nothing');
+}
+function endListening(reason) {
+  if (T.st !== 'listening') return;
+  clearInterval(T.vadTimer);
+  T.endReason = reason;
+  setState('sending', reason === 'nothing' ? 'TARS' : 'Sending');
+  try { if (T.rec && T.rec.state !== 'inactive') T.rec.stop(); else onRecorded(); } catch { onRecorded(); }
+}
+function stopMic() {
+  try { if (T.stream) T.stream.getTracks().forEach(t => t.stop()); } catch {}
+  try { if (T.srcNode) T.srcNode.disconnect(); } catch {}
+  T.stream = null; T.srcNode = null; T.an = null;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+}
+function onRecorded() {
+  stopMic();
+  const blob = new Blob(T.chunks, { type: (T.rec && T.rec.mimeType) || 'audio/mp4' });
+  T.chunks = []; T.rec = null;
+  if (T.endReason === 'nothing' || blob.size < 1200) { setState('idle'); setReply("I didn't hear anything. Tap TARS and try again.", 'hint'); return; }
+  log(`recorded ${(blob.size / 1024).toFixed(0)} KB ${blob.type} (${T.endReason})`);
+  sendTurn({ audio: blob });
+}
+function failLocal(msg) { stopMic(); setState('error'); setReply(esc(msg), 'err'); speakLocal(msg); }
+function cancelTurn() {
+  if (T.turn) T.turn.cancelled = true;
+  try { if (T.abort) T.abort.abort(); } catch {}
+  stopVoice(); setState('idle'); setReply('Cancelled.', 'hint');
+}
+function placesParam() { return places.slice(0, 30).map(p => `${String(p.name).replace(/[|~]/g, ' ')}~${p.kind || ''}`).join('|'); }
+async function sendTurn(req) {
+  const turn = { at: Date.now(), kind: req.audio ? 'voice' : 'quick', heard: req.label || '', reply: [], actions: [], error: '', mode: mode() };
+  T.turn = turn;
+  stopVoice(); clearAction();
+  $('#said').textContent = req.audio ? '' : `“${req.label || req.text}”`;
+  setReply(req.audio ? 'Listening back…' : 'Thinking…', 'hint');
+  setState('thinking', req.audio ? 'Hearing you' : 'Thinking');
+  const ctl = new AbortController(); T.abort = ctl;
+  let idleTimer = 0;
+  const kick = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { turn.stalled = true; ctl.abort(); }, 30000); };
+  kick();
+  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, places: placesParam(), v: VERSION };
+  try {
+    const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal, cache: 'no-store' };
+    const res = req.audio
+      ? await fetch(`${pcBase()}/talk?${new URLSearchParams(o)}`, { ...opts, body: req.audio })
+      : await fetch(`${pcBase()}/say`, { ...opts, body: JSON.stringify({ ...o, text: req.text, kind: 'quick' }) });
+    if (!res.ok) throw new Error(res.status === 403 ? 'The PC refused this phone. Is Tailscale signed in?' : `The PC answered ${res.status}.`);
+    L.ok = true; renderLink();
+    await readEvents(res, ev => { if (T.turn === turn) { kick(); onEvent(ev, turn); } });
+  } catch (e) {
+    if (turn.cancelled || T.turn !== turn) return;
+    const offline = e instanceof TypeError;
+    if (offline) { L.ok = false; renderLink(); }
+    turn.error = turn.stalled ? 'The PC went quiet. Try again in a moment.' : offline ? "Can't reach the PC. Is Tailscale on, with signal?" : (e.message || 'Something went wrong.');
+    showError(turn.error, offline);
+  } finally {
+    clearTimeout(idleTimer);
+    if (T.abort === ctl) T.abort = null;
+    if (T.turn === turn && !turn.cancelled) finishTurn(turn);
+  }
+}
+async function readEvents(res, cb) {
+  const handle = line => { line = line.trim(); if (!line) return; let ev; try { ev = JSON.parse(line); } catch { return; } cb(ev); };
+  if (res.body && res.body.getReader) {
+    const rd = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await rd.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i; while ((i = buf.indexOf('\n')) >= 0) { handle(buf.slice(0, i)); buf = buf.slice(i + 1); }
+    }
+    handle(buf + dec.decode());
+  } else (await res.text()).split('\n').forEach(handle);
+}
+function onEvent(ev, turn) {
+  switch (ev.t) {
+    case 'heard':
+      turn.heard = ev.text || '';
+      $('#said').textContent = ev.text ? `“${ev.text}”` : '';
+      setState('thinking', 'Thinking'); setReply('…', 'hint');
+      break;
+    case 'queued': setState('thinking', 'TARS is busy'); setReply('Finishing something else first…', 'hint'); break;
+    case 'say': addSentence(ev, turn); break;
+    case 'voice': enqueueVoice(ev); break;
+    case 'go': turn.actions.push({ t: 'go', place: ev.place }); showGo(ev.place); break;
+    case 'play': turn.actions.push({ t: 'play', url: ev.url, name: ev.name }); rememberTars(ev); showPlay(ev); break;
+    case 'error':
+      if (ev.code === 'silence' || ev.code === 'short') { turn.error = ev.msg; stopVoice(); setReply(esc(ev.msg) + ' Tap TARS and try again.', 'hint'); setState('idle'); }
+      else { turn.error = ev.msg; showError(ev.msg, false); }
+      break;
+    case 'done': turn.ms = ev.ms; break;
+  }
+}
+function addSentence(ev, turn) {
+  const r = $('#reply');
+  if (!turn.reply.length) { r.className = 'reply'; r.innerHTML = ''; }
+  turn.reply.push(ev.text);
+  const s = document.createElement('span');
+  s.dataset.id = ev.id; s.className = cfg.voice ? 'pending' : '';
+  s.textContent = (turn.reply.length > 1 ? ' ' : '') + ev.text;
+  r.appendChild(s);
+  if (T.st !== 'speaking') setState('thinking', cfg.voice ? 'Speaking' : 'TARS');
+}
+function mark(id, cls) { const s = document.querySelector(`#reply span[data-id="${id}"]`); if (s) s.className = cls === 'spoken' ? '' : cls; }
+function markAll(cls) { document.querySelectorAll('#reply span').forEach(s => { s.className = cls === 'spoken' ? '' : cls; }); }
+function enqueueVoice(ev) {
+  if (!cfg.voice || !ev.audio) return;
+  try {
+    const bin = atob(ev.audio), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    V.q.push({ id: ev.id, url: URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' })), env: ev.env || [], dur: ev.dur || 0 });
+  } catch (e) { log('voice decode: ' + e.message); return; }
+  if (!V.cur) playNext();
+}
+function playNext() {
+  const item = V.q.shift();
+  if (!item) { V.cur = null; settle(); return; }
+  V.cur = item; mark(item.id, 'now');
+  setState('speaking');
+  voiceEl.src = item.url;
+  const p = voiceEl.play();
+  if (p) p.catch(err => {
+    log('voice blocked: ' + err.name);
+    if (err.name === 'NotAllowedError') {                // iOS wants a tap first: keep the reply and ask for one
+      V.q.unshift(item); V.cur = null; markAll('');
+      setState('idle', 'Tap to hear TARS');
+      showAction({ title: 'Tap to hear TARS', sub: 'iOS wants a tap before it plays sound', button: 'PLAY', run: () => playNext() });
+      return;
+    }
+    voiceDone();
+  });
+}
+function voiceDone() {
+  if (!V.cur) return;
+  mark(V.cur.id, 'spoken'); URL.revokeObjectURL(V.cur.url); V.cur = null; playNext();
+}
+voiceEl.addEventListener('ended', voiceDone);
+voiceEl.addEventListener('error', () => { if (V.cur) { log('voice error'); voiceDone(); } });
+function stopVoice() {
+  V.q.forEach(x => URL.revokeObjectURL(x.url)); V.q = [];
+  if (V.cur) { try { voiceEl.pause(); } catch {} URL.revokeObjectURL(V.cur.url); V.cur = null; }
+}
+function settle() {                                  // after the last voice, or the stream ended with nothing to play
+  if (T.abort || V.cur || V.q.length || T.st === 'listening' || T.st === 'arming') return;
+  if (T.st === 'error') return;
+  markAll('spoken'); setState('idle');
+}
+function finishTurn(turn) {
+  if (!turn.reply.length && !turn.error && !turn.actions.length) { turn.error = 'TARS had nothing to say.'; showError(turn.error, false); }
+  convos.unshift({ at: turn.at, kind: turn.kind, heard: turn.heard, reply: turn.reply.join(' '), actions: turn.actions, error: turn.error, ms: turn.ms, mode: turn.mode });
+  convos = convos.slice(0, 60); store.set('history', convos);
+  if (!cfg.voice || !V.cur && !V.q.length) { if (T.st !== 'error') { markAll('spoken'); setState('idle'); } }
+}
+function showError(msg, offline) {
+  stopVoice(); setState('error');
+  setReply(esc(msg), 'err');
+  if (offline) showAction({ title: 'Talk on Telegram instead', sub: 'Opens the Telegram app', button: 'OPEN', run: openTelegram });
+  speakLocal(msg);
+}
+function notLinked() {
+  setState('error', 'Not linked');
+  setReply("TARS isn't linked to this phone yet.", 'err');
+  showAction({ title: 'Link TARS', sub: 'Needs Tailscale on the PC and this phone', button: 'SET UP', run: () => openSheet('setup'),
+    alt: { label: 'Telegram', run: openTelegram } });
+}
+async function ask(text, label) {
+  wakeOn(); unlockAudio();
+  if (T.st !== 'idle' && T.st !== 'error') return;
+  if (!pcBase()) { notLinked(); return; }
+  sendTurn({ text, label });
+}
+
+// ---------- action cards (navigate / play) ----------
+let actionTimer = 0;
+function showAction(a) {
+  const el = $('#action');
+  el.innerHTML = `<div class="what"><div>${esc(a.title)}</div><div>${esc(a.sub || '')}</div></div>`
+    + (a.alt ? `<button class="alt">${esc(a.alt.label)}</button>` : '') + `<button class="go">${esc(a.button)}</button><button class="x" aria-label="Dismiss">${icon('x')}</button>`;
+  el.hidden = false; $('#tars').classList.add('has-action');
+  el.querySelector('.go').onclick = e => { e.stopPropagation(); a.run(); if (!a.keep) clearAction(); };
+  if (a.alt) el.querySelector('.alt').onclick = e => { e.stopPropagation(); a.alt.run(); };
+  el.querySelector('.x').onclick = e => { e.stopPropagation(); clearAction(); };
+  clearTimeout(actionTimer); actionTimer = setTimeout(clearAction, 90000);
+}
+function clearAction() { const el = $('#action'); el.hidden = true; el.innerHTML = ''; clearTimeout(actionTimer); $('#tars').classList.remove('has-action'); }
+function showGo(name) {
+  const p = findPlace(name);
+  showAction({ title: p ? p.name : name, sub: `${APPNAME[cfg.maps]}${p ? '' : ' · search'}`, button: 'GO', run: () => p ? goPlace(p) : goQuery(name) });
+}
+function showPlay(ev) {
+  const pinned = music.some(m => m.url === ev.url);
+  showAction({ title: ev.name || 'Playlist from TARS', sub: 'Spotify', button: 'PLAY', run: () => playUrl(ev.url),
+    alt: pinned ? null : { label: 'Pin', run: () => { pinMusic(ev.url, ev.name); toast('Pinned to Music'); clearAction(); } } });
+}
+function rememberTars(ev) {
+  fromTars = [{ url: ev.url, name: ev.name || 'Playlist from TARS', at: Date.now() }].concat(fromTars.filter(x => x.url !== ev.url)).slice(0, 12);
+  store.set('fromtars', fromTars); renderTiles();
+}
+function pinMusic(url, name) {
+  if (music.some(m => m.url === url)) return;
+  music.unshift({ id: uid(), url, name: name || 'Playlist' }); store.set('music', music); renderTiles();
+}
+
+// ---------- the TARS animation ----------
+const SLABS = [...document.querySelectorAll('.slab i')];
+const cur = [0.12, 0.12, 0.12, 0.12];
+let frame = 0;
+function animate(t) {
+  requestAnimationFrame(animate);
+  if (document.hidden || (T.st === 'idle' && ++frame % 3)) return;   // idle breathing doesn't need 60 fps
+  let env = 0;
+  if (T.st === 'speaking' && V.cur && V.cur.env.length) env = V.cur.env[Math.min(V.cur.env.length - 1, Math.floor((voiceEl.currentTime || 0) * 20))] || 0;
+  for (let i = 0; i < 4; i++) {
+    let target;
+    if (T.st === 'listening' || T.st === 'arming') target = 0.08 + T.level * (0.78 + 0.22 * Math.sin(t / 95 + i * 1.7));
+    else if (T.st === 'thinking' || T.st === 'sending') target = 0.12 + 0.55 * Math.max(0, Math.sin(t / 240 - i * 0.85)) ** 3;
+    else if (T.st === 'speaking') target = 0.1 + env * (0.8 + 0.2 * Math.sin(t / 70 + i * 2.1)) * (i === 1 || i === 2 ? 1 : 0.8);
+    else target = 0.1 + 0.035 * Math.sin(t / 1500 + i * 0.9);
+    cur[i] += (clamp(target, 0.04, 1) - cur[i]) * 0.3;
+    SLABS[i].style.setProperty('--lv', cur[i].toFixed(3));
+  }
+}
+
+// ---------- home screen tiles ----------
+function renderQuick() {
+  $('#quick').innerHTML = quick.map((q, i) => `<button data-q="${i}">${esc(q.label)}</button>`).join('');
+  setState(T.st, T.st === 'idle' ? null : $('#status').textContent);
+}
+function tile(o) {
+  return `<button class="tile${o.cls ? ' ' + o.cls : ''}" data-act="${o.act}" data-id="${esc(o.id || '')}" data-kind="${esc(o.kind || '')}" aria-label="${esc(o.name)}">${icon(o.icon)}<div style="width:100%;min-width:0"><div class="n">${esc(o.name)}</div>${o.sub ? `<div class="s">${esc(o.sub)}</div>` : ''}</div></button>`;
+}
+function renderTiles() {
+  const go = places.slice(0, 3).map(p => tile({ act: 'place', id: p.id, icon: KIND[p.kind] ? KIND[p.kind].icon : 'pin', name: p.name }));
+  for (const k of ['home', 'work', 'gym']) {
+    if (go.length >= 3) break;
+    if (!places.some(p => p.kind === k)) go.push(tile({ act: 'addplace', kind: k, icon: KIND[k].icon, name: 'Add ' + KIND[k].label.toLowerCase(), cls: 'ghost' }));
+  }
+  while (go.length < 3) go.push(tile({ act: 'addplace', kind: 'other', icon: 'plus', name: 'Add place', cls: 'ghost' }));
+  go.push(tile({ act: 'sheet', id: 'places', icon: 'more', name: places.length > 3 ? `+${places.length - 3}` : 'All', cls: 'more' }));
+  $('#gotiles').innerHTML = go.join('');
+  $('#mapsname').textContent = '· ' + APPNAME[cfg.maps];
+  const list = music.map(m => ({ ...m, pinned: true })).concat(fromTars.filter(f => !music.some(m => m.url === f.url)).map(f => ({ id: 'tars:' + f.url, url: f.url, name: f.name, fromT: true })));
+  const mt = [tile({ act: 'spotify', icon: 'play', name: 'Spotify', cls: 'hot' })];
+  list.slice(0, 2).forEach(m => mt.push(tile({ act: 'music', id: m.url, icon: m.fromT ? 'spark' : 'note', name: m.name })));
+  if (mt.length < 3) mt.push(tile({ act: 'ask', id: '2', icon: 'spark', name: 'DJ me' }));
+  while (mt.length < 3) mt.push(tile({ act: 'sheet', id: 'music', icon: 'plus', name: 'Add playlist', cls: 'ghost' }));
+  mt.push(tile({ act: 'sheet', id: 'music', icon: 'more', name: 'All', cls: 'more' }));
+  $('#musictiles').innerHTML = mt.join('');
+}
+document.addEventListener('click', e => {
+  const q = e.target.closest('#quick button[data-q]');
+  if (q) { const it = quick[+q.dataset.q]; if (it) ask(it.text, it.label); return; }
+  const t = e.target.closest('.tile');
+  if (t) {
+    const { act, id, kind } = t.dataset;
+    if (act === 'place') { const p = places.find(x => x.id === id); if (p) goPlace(p); }
+    else if (act === 'addplace') { if (!guard()) return; openSheet('places', { add: kind }); }
+    else if (act === 'sheet') { if (!guard()) return; openSheet(id); }
+    else if (act === 'spotify') openExternal(cfg.link.spotify === 'app' ? 'spotify:' : 'https://open.spotify.com/');
+    else if (act === 'music') playUrl(id);
+    else if (act === 'ask') { const it = DEFAULT_QUICK[+id]; ask(it.text, it.label); }
+    return;
+  }
+  const o = e.target.closest('[data-open]');
+  if (o) { if (!guard()) return; openSheet(o.dataset.open); }
+});
+function guard() { if (driving()) { toast('Park first. Menus are locked while you drive.'); return false; } return true; }
+$('#tars').addEventListener('click', onTarsTap);
+$('#linkdot').addEventListener('click', () => { if (guard()) openSheet('settings'); });
+$('#wx').addEventListener('click', () => {
+  const w = WX.now; if (!w) return;
+  toast(`${WMO(w.code)[1]}, ${w.temp}°${w.rainAt ? (w.rainAt === 'now' ? ' · raining now' : ' · rain likely from ' + w.rainAt) : ' · no rain expected soon'}`);
+});
+$('#mode').addEventListener('click', () => {
+  if (fresh()) { toast(G.moving ? 'Driving: TARS keeps it to one line.' : 'Parked: TARS can say a bit more.'); return; }
+  G.manual = G.manual === 'parked' ? 'driving' : 'parked'; renderSpeed();
+  toast(G.manual === 'parked' ? 'No GPS: treating you as parked.' : 'No GPS: treating you as driving.');
+});
+$('#setupbar').addEventListener('click', () => { if (guard()) openSheet('setup'); });
+
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2800); }
+function modal(title, text, buttons) {
+  $('#mtitle').textContent = title; $('#mtext').textContent = text;
+  const a = $('#macts'); a.innerHTML = '';
+  for (const b of buttons) { const el = document.createElement('button'); el.className = 'btn' + (b.hot ? ' hot' : ''); el.textContent = b.label; el.onclick = () => { $('#modal').hidden = true; b.run && b.run(); }; a.appendChild(el); }
+  $('#modal').hidden = false;
+}
+
+// ---------- setup progress ----------
+const standalone = () => !!navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+function setupSteps() {
+  return [
+    { id: 'install', done: standalone(), title: 'Add to Home Screen', text: 'In Safari: Share, then Add to Home Screen. Open TARS from the icon so it runs full screen.' },
+    { id: 'check', done: Object.keys(checks).length >= 4, title: 'Check this phone', text: 'Speaker, microphone, location and which map and music apps open from here.' },
+    { id: 'places', done: places.length > 0, title: 'Save your places', text: 'Home, work and gym, saved on this phone only.' },
+    { id: 'link', done: !!(checks.pc && checks.pc.ok), title: 'Link TARS', text: 'Needs Tailscale on the PC and this phone. Then TARS hears you and answers out loud.' },
+  ];
+}
+function renderSetupBar() {
+  const s = setupSteps(), left = s.filter(x => !x.done).length, b = $('#setupbar');
+  if (!left || store.get('setupHidden', false)) { b.hidden = true; return; }
+  b.hidden = false; b.innerHTML = `Finish setup · ${s.length - left} of ${s.length} ›`;
+}
+
+// ---------- sheets ----------
+let sheetName = '', sheetArg = null;
+function openSheet(name, arg) {
+  sheetName = name; sheetArg = arg || null;
+  $('#sheettitle').textContent = ({ places: 'Places', music: 'Music', history: 'History', settings: 'Settings', check: 'Check this phone', setup: 'Set up' })[name] || '';
+  renderSheet();
+  $('#sheet').classList.add('on');
+  $('#sheetbody').scrollTop = 0;
+}
+function closeSheet() { $('#sheet').classList.remove('on'); sheetName = ''; stopMicTest(); renderTiles(); renderQuick(); renderSetupBar(); }
+$('#sheetdone').addEventListener('click', closeSheet);
+function renderSheet() { const f = SHEETS[sheetName]; if (f) f($('#sheetbody')); }
+const seg = (name, opts, val) => `<div class="seg" data-seg="${name}">${opts.map(([v, l]) => `<button data-v="${esc(v)}" class="${v === val ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>`;
+
+const SHEETS = {
+  places(B) {
+    const add = sheetArg && sheetArg.add;
+    B.innerHTML = `
+      <div class="card"><h3>Maps app</h3><p>Where GO sends you. Check this phone shows which ones open from here.</p>
+        ${seg('maps', [['google', 'Google Maps'], ['waze', 'Waze'], ['apple', 'Apple Maps']], cfg.maps)}</div>
+      <div class="card" id="addcard"><h3>${add ? 'Add ' + (KIND[add] ? KIND[add].label.toLowerCase() : 'a place') : 'Add a place'}</h3>
+        <p>Saved on this phone only. Stand at the place and use where you are, or type an address or a name Maps knows.</p>
+        <input class="field" id="pname" placeholder="Name, like Home or Virgin Active" value="${esc(add && add !== 'other' ? KIND[add].label : '')}" autocomplete="off">
+        ${seg('pkind', [['home', 'Home'], ['work', 'Work'], ['gym', 'Gym'], ['other', 'Other']], add || 'other')}
+        <input class="field" id="paddr" placeholder="Address or place name (or use where you are)" autocomplete="off">
+        <div class="acts"><button class="btn hot" id="phere">${icon('loc')} Use where I am</button><button class="btn" id="psave">Save address</button></div>
+        <p id="pmsg"></p></div>
+      <div class="card"><h3>Saved</h3><div id="plist"></div></div>`;
+    const list = $('#plist', B);
+    list.innerHTML = places.length ? places.map(p => `<div class="row"><svg class="i"><use href="#i-${KIND[p.kind] ? KIND[p.kind].icon : 'pin'}"/></svg>
+      <div class="grow"><div class="t">${esc(p.name)}</div><div class="s">${p.lat != null ? 'Saved spot' + (p.acc ? ` (±${p.acc} m)` : '') : esc(p.q)}</div></div>
+      <button class="btn small" data-pgo="${p.id}">Go</button><button class="btn small danger" data-pdel="${p.id}">Delete</button></div>`).join('') : '<div class="empty">No places yet.</div>';
+    let kind = add || 'other';
+    B.querySelectorAll('[data-seg]').forEach(s => s.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      s.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      if (s.dataset.seg === 'maps') { cfg.maps = b.dataset.v; saveCfg(); }
+      else { kind = b.dataset.v; const n = $('#pname', B); if (!n.value || Object.values(KIND).some(k => k.label === n.value)) n.value = kind === 'other' ? '' : KIND[kind].label; }
+    }));
+    const msg = t => { $('#pmsg', B).textContent = t; };
+    const saveP = p => { places = places.filter(x => !(x.kind === p.kind && p.kind !== 'other' && x.name === p.name)); places.push(p); store.set('places', places); sheetArg = null; renderSheet(); toast(`Saved ${p.name}`); };
+    $('#phere', B).onclick = () => {
+      const name = $('#pname', B).value.trim() || (KIND[kind] ? KIND[kind].label : 'Place');
+      if (fresh() && G.fix.acc <= 30) { saveP({ id: uid(), name, kind, lat: +G.fix.lat.toFixed(6), lon: +G.fix.lon.toFixed(6), acc: Math.round(G.fix.acc) }); return; }
+      msg('Getting a precise fix…');
+      navigator.geolocation.getCurrentPosition(pos => {
+        const c = pos.coords;
+        if (c.accuracy > 80) { msg(`Only accurate to ${Math.round(c.accuracy)} m. Step outside or wait a few seconds, then try again.`); return; }
+        saveP({ id: uid(), name, kind, lat: +c.latitude.toFixed(6), lon: +c.longitude.toFixed(6), acc: Math.round(c.accuracy) });
+      }, e => msg("Couldn't get your location: " + e.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    };
+    $('#psave', B).onclick = () => {
+      const q = $('#paddr', B).value.trim(), name = $('#pname', B).value.trim() || q;
+      if (!q) { msg('Type an address or a place name first, or use where you are.'); return; }
+      saveP({ id: uid(), name, kind, q });
+    };
+    list.addEventListener('click', e => {
+      const g = e.target.closest('[data-pgo]'), d = e.target.closest('[data-pdel]');
+      if (g) { const p = places.find(x => x.id === g.dataset.pgo); if (p) goPlace(p); }
+      if (d) { const p = places.find(x => x.id === d.dataset.pdel); modal(`Delete ${p.name}?`, 'It only lives on this phone.', [{ label: 'Keep' }, { label: 'Delete', hot: true, run: () => { places = places.filter(x => x !== p); store.set('places', places); renderSheet(); } }]); }
+    });
+  },
+  music(B) {
+    B.innerHTML = `
+      <div class="card"><h3>Add a playlist</h3><p>In Spotify: Share, then Copy link. Paste it here.</p>
+        <input class="field" id="murl" placeholder="https://open.spotify.com/playlist/…" autocomplete="off" autocapitalize="off">
+        <input class="field" id="mname" placeholder="Name on the button" autocomplete="off">
+        <div class="acts"><button class="btn" id="mpaste">Paste</button><button class="btn hot" id="madd">Pin it</button></div><p id="mmsg"></p></div>
+      <div class="card"><h3>Pinned</h3><div id="mlist"></div></div>
+      <div class="card"><h3>From TARS</h3><p>Playlists TARS made or found for you in the car.</p><div id="tlist"></div></div>`;
+    $('#mlist', B).innerHTML = music.length ? music.map(m => `<div class="row">${icon('note')}<div class="grow"><div class="t">${esc(m.name)}</div></div>
+      <button class="btn small" data-mplay="${esc(m.url)}">Play</button><button class="btn small danger" data-mdel="${m.id}">Remove</button></div>`).join('') : '<div class="empty">Nothing pinned yet.</div>';
+    $('#tlist', B).innerHTML = fromTars.length ? fromTars.map(m => `<div class="row">${icon('spark')}<div class="grow"><div class="t">${esc(m.name)}</div><div class="s">${new Date(m.at).toLocaleDateString()}</div></div>
+      <button class="btn small" data-mplay="${esc(m.url)}">Play</button>${music.some(x => x.url === m.url) ? '' : `<button class="btn small" data-mpin="${esc(m.url)}" data-name="${esc(m.name)}">Pin</button>`}</div>`).join('') : '<div class="empty">Ask TARS to “DJ me” and the mix shows up here.</div>';
+    const msg = t => { $('#mmsg', B).textContent = t; };
+    $('#mpaste', B).onclick = async () => { try { $('#murl', B).value = (await navigator.clipboard.readText()).trim(); } catch { msg('Paste was blocked. Long-press the box and choose Paste.'); } };
+    $('#madd', B).onclick = () => {
+      const url = $('#murl', B).value.trim(), name = $('#mname', B).value.trim();
+      if (!/open\.spotify\.com\/|^spotify:/.test(url)) { msg('That isn’t a Spotify link.'); return; }
+      pinMusic(url, name || 'Playlist'); renderSheet();
+    };
+    B.addEventListener('click', e => {
+      const p = e.target.closest('[data-mplay]'), d = e.target.closest('[data-mdel]'), pin = e.target.closest('[data-mpin]');
+      if (p) playUrl(p.dataset.mplay);
+      if (d) { music = music.filter(m => m.id !== d.dataset.mdel); store.set('music', music); renderSheet(); }
+      if (pin) { pinMusic(pin.dataset.mpin, pin.dataset.name); renderSheet(); }
+    }, { once: false });
+  },
+  history(B) {
+    B.innerHTML = convos.length ? convos.map(h => `<div class="card hist"><div class="q">${h.kind === 'quick' ? 'Tapped' : 'You'}: ${esc(h.heard || '…')}</div>
+      <div class="a">${esc(h.reply || h.error || '')}</div>
+      <div class="m">${new Date(h.at).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · ${esc(h.mode || '')}${h.ms ? ' · ' + (h.ms / 1000).toFixed(1) + ' s' : ''}${(h.actions || []).map(a => ' · ' + (a.t === 'go' ? 'go: ' + a.place : 'play: ' + (a.name || 'Spotify'))).map(esc).join('')}</div></div>`).join('')
+      + '<div class="acts"><button class="btn danger" id="hclear">Clear history</button></div>' : '<div class="empty">Nothing yet. Your car conversations with TARS show up here, on this phone only.</div>';
+    const c = $('#hclear', B); if (c) c.onclick = () => modal('Clear history?', 'Only this phone keeps it.', [{ label: 'Keep' }, { label: 'Clear', hot: true, run: () => { convos = []; store.set('history', convos); renderSheet(); } }]);
+  },
+  settings(B) {
+    B.innerHTML = `
+      <div class="card"><h3>TARS link</h3><p>Your PC’s Tailscale name, ending in .ts.net (in the Tailscale app, tap the PC and copy its name). Tailscale must be on for TARS to hear you.</p>
+        <input class="field" id="spc" placeholder="pc-name.tailnet.ts.net" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(pcRaw())}">
+        <div class="acts"><button class="btn hot" id="spctest">Save + test</button></div><p id="spcres">${linkText()}</p></div>
+      <div class="card"><h3>Humor setting</h3><p>TARS’s own dial. It’s told this with every question.</p>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><b style="font:300 34px var(--display)" id="shv">${cfg.humor}%</b></div>
+        <input type="range" id="shum" min="0" max="100" step="5" value="${cfg.humor}"></div>
+      <div class="card"><h3>Voice replies</h3><p>Off means TARS answers on screen only.</p>${seg('voice', [['1', 'Spoken'], ['0', 'Screen only']], cfg.voice ? '1' : '0')}</div>
+      <div class="card"><h3>Look</h3><p>Auto goes to the dim night look at sunset.</p>${seg('theme', [['auto', 'Auto'], ['day', 'Day'], ['night', 'Night']], cfg.theme)}</div>
+      <div class="card"><h3>Quick asks</h3><p>The buttons under TARS. One per line: Button label = what TARS hears.</p>
+        <textarea class="field" id="squick" rows="7">${esc(quick.map(q => `${q.label} = ${q.text}`).join('\n'))}</textarea>
+        <div class="acts"><button class="btn" id="squicksave">Save buttons</button><button class="btn small" id="squickreset">Reset</button></div></div>
+      <div class="card"><h3>Telegram fallback</h3><p>If the PC can’t be reached, a button opens Telegram. Put the bot’s username here to land straight in its chat.</p>
+        <input class="field" id="stg" placeholder="bot username (optional)" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(cfg.tg)}"></div>
+      <div class="card"><h3>About</h3><p>TARS Drive v${VERSION}. Places, playlists, history and the PC address stay on this phone. Questions go to your PC over Tailscale. Weather uses Open-Meteo with your location rounded to about a kilometre.</p>
+        <div class="acts"><button class="btn small" id="ssetup">Setup steps</button><button class="btn small danger" id="sreset">Reset this app</button></div></div>`;
+    $('#spctest', B).onclick = async () => {
+      store.set('pc', $('#spc', B).value.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, ''));
+      L.ok = null; renderLink();
+      const r = $('#spcres', B);
+      if (!pcBase()) { r.textContent = 'Link removed.'; return; }
+      r.textContent = 'Testing…';
+      try { await hello(10000); r.textContent = linkText(); setCheck('pc', true, `${L.rtt} ms`); }
+      catch { r.textContent = linkText(); setCheck('pc', false, L.err); }
+    };
+    $('#shum', B).oninput = e => { cfg.humor = +e.target.value; $('#shv', B).textContent = cfg.humor + '%'; saveCfg(); if (T.st === 'idle') setState('idle'); };
+    B.querySelectorAll('[data-seg]').forEach(s => s.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      s.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      if (s.dataset.seg === 'voice') cfg.voice = b.dataset.v === '1';
+      if (s.dataset.seg === 'theme') { cfg.theme = b.dataset.v; applyTheme(); }
+      saveCfg();
+    }));
+    $('#squicksave', B).onclick = () => {
+      const q = $('#squick', B).value.split('\n').map(l => l.split('=')).filter(p => p[0].trim())
+        .map(([l, ...r]) => ({ label: l.trim().slice(0, 24), text: (r.join('=').trim() || l.trim()).slice(0, 400) })).slice(0, 12);
+      quick = q.length ? q : DEFAULT_QUICK; store.set('quick', quick); toast('Quick asks saved');
+    };
+    $('#squickreset', B).onclick = () => { quick = DEFAULT_QUICK; store.set('quick', quick); renderSheet(); };
+    $('#stg', B).onchange = e => { cfg.tg = e.target.value.trim().replace(/^@/, ''); saveCfg(); };
+    $('#ssetup', B).onclick = () => { store.set('setupHidden', false); openSheet('setup'); };
+    $('#sreset', B).onclick = () => modal('Reset TARS Drive?', 'Deletes places, playlists, history, checks and the PC address from this phone.', [{ label: 'Cancel' },
+      { label: 'Reset', hot: true, run: () => { try { Object.keys(localStorage).filter(k => k.startsWith('drive.')).forEach(k => localStorage.removeItem(k)); } catch {} location.reload(); } }]);
+  },
+  setup(B) {
+    const s = setupSteps();
+    B.innerHTML = s.map((x, i) => `<div class="step${x.done ? ' done' : ''}"><div class="num">${x.done ? '✓' : i + 1}</div><div class="grow"><div class="t" style="font-weight:700">${esc(x.title)}</div>
+      <p class="note">${esc(x.text)}</p>${x.done ? '' : `<div class="acts"><button class="btn small hot" data-step="${x.id}">${{ install: 'How', check: 'Check now', places: 'Add places', link: 'Link' }[x.id]}</button></div>`}</div></div>`).join('')
+      + `<div class="card" style="margin-top:14px"><h3>Hey Siri, TARS (optional, after the link works)</h3><p>Talk to TARS without touching the screen, from the lock screen too. In the Shortcuts app, make a new shortcut called <b>TARS</b>:</p>
+        <ol class="how"><li><b>Dictate Text</b> (Stop Listening: After Pause)</li>
+        <li><b>Get Contents of URL</b>: <span style="-webkit-user-select:all;user-select:all">${esc((pcBase() || 'https://pc-name.tailnet.ts.net/car') + '/say?format=mp3')}</span>, Method POST, Request Body JSON with <b>text</b> = Dictated Text and <b>mode</b> = driving</li>
+        <li><b>Play Sound</b> with the Contents of URL</li></ol>
+        <p>Then say “Hey Siri, TARS”. If Play Sound gives you trouble, use <b>/say?format=json</b>, then Get Dictionary Value <b>reply</b>, then <b>Speak Text</b>.</p></div>
+        <div class="acts"><button class="btn small" id="shide">Hide the setup bar</button></div>`;
+    B.querySelectorAll('[data-step]').forEach(b => b.onclick = () => {
+      const id = b.dataset.step;
+      if (id === 'install') modal('Add to Home Screen', 'Open this page in Safari, tap Share (the square with the arrow), then Add to Home Screen. Open TARS from the new icon.', [{ label: 'OK', hot: true }]);
+      if (id === 'check') openSheet('check');
+      if (id === 'places') openSheet('places', { add: 'home' });
+      if (id === 'link') openSheet('settings');
+    });
+    $('#shide', B).onclick = () => { store.set('setupHidden', true); closeSheet(); };
+  },
+  check(B) { renderChecks(B); },
+};
+function linkText() {
+  if (!pcBase()) return 'Not linked yet.';
+  if (L.ok) return `Linked ✓ ${L.rtt} ms${L.busy ? ' · TARS is busy right now' : ''}`;
+  if (L.ok === false) return `Can’t reach the PC: ${L.err}. Check Tailscale is on and the name is right.`;
+  return 'Checking…';
+}
+
+// ---------- check this phone (prove each piece on the real phone) ----------
+function setCheck(id, ok, detail) { checks[id] = { ok, detail: detail || '', at: Date.now() }; store.set('checks', checks); if (sheetName === 'check') renderSheet(); renderSetupBar(); }
+const LINK_TESTS = [
+  ['l_gapp', 'Google Maps (app link)', () => mapsLink('google', 'app', { q: 'petrol station' }), 'google', 'app'],
+  ['l_gweb', 'Google Maps (web link)', () => mapsLink('google', 'web', { q: 'petrol station' }), 'google', 'web'],
+  ['l_wapp', 'Waze (app link)', () => mapsLink('waze', 'app', { q: 'petrol station' }), 'waze', 'app'],
+  ['l_wweb', 'Waze (web link)', () => mapsLink('waze', 'web', { q: 'petrol station' }), 'waze', 'web'],
+  ['l_aweb', 'Apple Maps', () => mapsLink('apple', 'web', { q: 'petrol station' }), 'apple', 'web'],
+  ['l_sapp', 'Spotify (app link)', () => 'spotify:', 'spotify', 'app'],
+  ['l_sweb', 'Spotify (web link)', () => 'https://open.spotify.com/', 'spotify', 'web'],
+  ['l_tg', 'Telegram', () => 'tg://', null, null],
+];
+const pendingLink = { id: null, at: 0 };
+function renderChecks(B) {
+  const badge = id => { const c = checks[id]; return c ? `<span class="badge ${c.ok ? 'ok' : 'bad'}">${c.ok ? 'OK' : 'NO'}</span>` : '<span class="badge">—</span>'; };
+  const det = id => checks[id] && checks[id].detail ? `<div class="s">${esc(checks[id].detail)}</div>` : '';
+  const row = (id, title, btn) => `<div class="row"><div class="grow"><div class="t">${esc(title)}</div>${det(id)}</div>${badge(id)}${btn ? `<button class="btn small" data-run="${id}">${btn}</button>` : ''}</div>`;
+  B.innerHTML = `
+    <div class="card"><h3>Sound and voice</h3><p>Turn the volume up. The speaker test plays TARS’s real voice.</p>
+      ${row('speaker', 'Speaker', 'Play')}${row('mic', 'Microphone', 'Test')}<div class="meter" id="mmeter"><i></i></div>${row('speaker2', 'Speaker after the mic', 'Play')}</div>
+    <div class="card"><h3>This phone</h3>${row('install', 'Running from the Home Screen', '')}${row('gps', 'Location and speed', 'Test')}${row('wake', 'Screen stays on', 'Test')}${row('storage', 'Storage kept', 'Test')}${row('pc', 'TARS link', pcBase() ? 'Test' : '')}</div>
+    <div class="card"><h3>Apps that open from here</h3><p>Each one opens a search for a petrol station. Come back with the ◀ TARS link in the corner, then say if it worked.</p>
+      ${LINK_TESTS.map(([id, title]) => row(id, title, 'Open')).join('')}</div>
+    <div class="acts"><button class="btn hot" id="cauto">Run the automatic ones</button><button class="btn" id="creport">Send the results to the PC</button><button class="btn" id="cshare">Share</button></div>
+    <p class="note" id="cmsg"></p>`;
+  if (!checks.install) setCheck('install', standalone(), standalone() ? '' : 'Open it from the Home Screen icon');
+  B.querySelectorAll('[data-run]').forEach(b => b.onclick = () => runCheck(b.dataset.run));
+  $('#cauto', B).onclick = () => Promise.all(['gps', 'wake', 'storage', ...(pcBase() ? ['pc'] : [])].map(id => runCheck(id)));
+  $('#creport', B).onclick = async () => {
+    const m = $('#cmsg', B);
+    if (!pcBase()) { m.textContent = 'Link TARS first (Settings).'; return; }
+    try {
+      const r = await fetch(`${pcBase()}/report`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(report()), cache: 'no-store' });
+      m.textContent = r.ok ? 'Sent. TARS can read it now.' : 'The PC said ' + r.status;
+    } catch { m.textContent = 'Couldn’t reach the PC.'; }
+  };
+  $('#cshare', B).onclick = async () => { const text = JSON.stringify(report(), null, 1); try { await navigator.share({ title: 'TARS Drive check', text }); } catch { try { await navigator.clipboard.writeText(text); toast('Copied'); } catch {} } };
+}
+function report() {
+  return { app: VERSION, at: new Date().toISOString(), ua: navigator.userAgent, standalone: standalone(), screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
+    checks, maps: cfg.maps, links: cfg.link, places: places.length, pinned: music.length, mime: pickAudioMime(), log: LOG.slice(-60) };
+}
+async function runCheck(id) {
+  const LT = LINK_TESTS.find(x => x[0] === id);
+  if (LT) { pendingLink.id = id; pendingLink.at = Date.now(); openExternal(LT[2]()); setTimeout(() => { if (pendingLink.id === id && document.visibilityState === 'visible') askLink(); }, 4000); return; }
+  if (id === 'speaker' || id === 'speaker2') {
+    unlockAudio();
+    voiceEl.src = 'tars-check.mp3';
+    try { await voiceEl.play(); } catch (e) { setCheck(id, false, 'Blocked: ' + e.name); return; }
+    voiceEl.onended = () => {
+      voiceEl.onended = null;
+      modal(id === 'speaker' ? 'Did you hear TARS?' : 'Was TARS loud and clear?', id === 'speaker' ? 'It said “Speaker check”.' : 'Not quiet like a phone call through the earpiece.', [
+        { label: 'No', run: () => setCheck(id, false, id === 'speaker' ? 'No sound' : 'Too quiet or from the earpiece') },
+        { label: 'Yes', hot: true, run: () => setCheck(id, true) }]);
+    };
+    return;
+  }
+  if (id === 'mic') return micTest();
+  if (id === 'gps') {
+    const say = (acc, spd) => setCheck('gps', acc < 100, `±${Math.round(acc)} m, speed ${spd == null ? 'not reported (worked out from movement)' : 'reported'}`);
+    if (fresh()) { say(G.fix.acc, G.fix.spd); return; }        // the live fix the app already has
+    setCheck('gps', false, 'Waiting for a fix…');
+    return new Promise(done => navigator.geolocation.getCurrentPosition(p => { say(p.coords.accuracy, p.coords.speed); onFix(p); done(); },
+      e => { setCheck('gps', false, e.code === 1 ? 'Permission denied' : e.code === 3 ? 'No fix in 15 s: go outside and try again' : e.message); done(); },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }));
+  }
+  if (id === 'wake') {
+    if (!('wakeLock' in navigator)) { setCheck('wake', false, 'Not supported: set Auto-Lock to Never in Settings'); return; }
+    try { const w = await navigator.wakeLock.request('screen'); setCheck('wake', true, 'Held while TARS is open'); if (!wake) { wake = w; w.addEventListener('release', () => { wake = null; }); } else w.release(); }
+    catch (e) { setCheck('wake', false, `${e.name}: set Auto-Lock to Never instead`); }
+    return;
+  }
+  if (id === 'storage') {
+    try { const p = navigator.storage && navigator.storage.persist ? await navigator.storage.persist() : false; setCheck('storage', true, p ? 'Kept for good' : 'iOS may clear it if the phone runs low'); }
+    catch (e) { setCheck('storage', false, e.message); }
+    return;
+  }
+  if (id === 'pc') { try { await hello(10000); setCheck('pc', true, `${L.rtt} ms`); } catch { setCheck('pc', false, L.err); } }
+}
+function askLink() {
+  const id = pendingLink.id; pendingLink.id = null;
+  const LT = LINK_TESTS.find(x => x[0] === id); if (!LT) return;
+  modal(`Did ${LT[1].replace(/ \(.*\)/, '')} open?`, LT[1], [
+    { label: 'No', run: () => setCheck(id, false) },
+    { label: 'Yes', hot: true, run: () => { setCheck(id, true); if (LT[3]) { const other = LINK_TESTS.find(x => x[3] === LT[3] && x[0] !== id); if (!(checks[other && other[0]] && checks[other[0]].ok && LT[4] === 'web')) { cfg.link[LT[3]] = LT[4]; saveCfg(); } } } }]);
+}
+let micT = null;
+async function micTest() {
+  stopMicTest();
+  unlockAudio();
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { setCheck('mic', false, e.name === 'NotAllowedError' ? 'Permission denied' : e.name); return; }
+  const mime = pickAudioMime(), rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined), parts = [];
+  rec.ondataavailable = e => e.data.size && parts.push(e.data);
+  let an = null, buf, peak = 0;
+  try { const src = T.ctx.createMediaStreamSource(stream); an = T.ctx.createAnalyser(); an.fftSize = 1024; buf = new Float32Array(1024); src.connect(an); } catch {}
+  micT = { stream, timer: setInterval(() => {
+    if (!an) return; an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x;
+    const lv = clamp((20 * Math.log10(Math.sqrt(s / buf.length) + 1e-9) + 58) / 38, 0, 1); peak = Math.max(peak, lv);
+    const m = $('#mmeter i'); if (m) m.style.width = (lv * 100).toFixed(0) + '%';
+  }, 60) };
+  toast('Say something for 3 seconds…');
+  rec.onstop = () => {
+    stopMicTest();
+    const b = new Blob(parts, { type: rec.mimeType || 'audio/mp4' });
+    voiceEl.src = URL.createObjectURL(b);
+    voiceEl.play().catch(() => {});
+    voiceEl.onended = () => { voiceEl.onended = null; modal('Did you hear yourself?', `Recorded ${(b.size / 1024).toFixed(0)} KB as ${b.type || 'audio'}${an ? `, loudest ${Math.round(peak * 100)}%` : ''}.`, [
+      { label: 'No', run: () => setCheck('mic', false, 'Recorded but not heard back') },
+      { label: 'Yes', hot: true, run: () => setCheck('mic', true, b.type) }]); };
+  };
+  rec.start(); setTimeout(() => { try { rec.stop(); } catch {} }, 3000);
+}
+function stopMicTest() { if (micT) { clearInterval(micT.timer); micT.stream.getTracks().forEach(t => t.stop()); micT = null; } }
+
+// ---------- life cycle ----------
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    gpsOn(); wakeOn(); tick(); linkLoop();
+    if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
+    if (pendingLink.id && Date.now() - pendingLink.at < 180000) setTimeout(askLink, 400);
+  } else {
+    gpsOff();
+    if (T.st === 'listening') endListening('tap');
+  }
+});
+['pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => wakeOn(), { passive: true, once: true }));
+document.addEventListener('touchstart', () => {}, { passive: true });   // iOS only shows :active with a touch listener
+
+function demo(kind) {
+  // Visual QA (#demo, #demo=listening|thinking|speaking|go|play|night|error): fake places and status, no network calls.
+  places = [{ id: 'h', name: 'Home', kind: 'home', q: 'Home' }, { id: 'w', name: 'Work', kind: 'work', q: 'Work' }, { id: 'g', name: 'Virgin Active', kind: 'gym', q: 'Gym' }];
+  music = [{ id: 'm1', name: 'Night Drive', url: 'https://open.spotify.com/playlist/demo' }];
+  fromTars = [{ url: 'https://open.spotify.com/playlist/demo2', name: 'Commute Heat', at: Date.now() }];
+  WX.now = { temp: 24, code: 2, day: 1, rainAt: kind === 'night' ? null : '17:30' }; WX.at = Date.now();
+  area = { lat: -33.92, lon: 18.42 };
+  G.fix = { t: Date.now() + 1e9, lat: 0, lon: 0, acc: 5, spd: 54 / 3.6 }; G.moving = true; G.trip = { start: Date.now() - 23 * 60000, m: 17400, end: Date.now() };
+  L.ok = true; store.set('pc', 'demo.example.ts.net');
+  checks = { install: { ok: true }, speaker: { ok: true }, mic: { ok: true }, gps: { ok: true } };
+  if (kind === 'night') cfg.theme = 'night';
+  renderTiles(); renderQuick(); renderWx(); renderSub(); renderSpeed(); renderLink(); applyTheme();
+  $('#said').textContent = '“How long is the drive home right now?”';
+  if (kind === 'listening') { setState('listening'); $('#said').textContent = ''; setReply('Go ahead. I stop when you do.', 'hint'); setInterval(() => { T.level = 0.35 + 0.5 * Math.abs(Math.sin(Date.now() / 300)); }, 50); }
+  else if (kind === 'thinking') { setState('thinking', 'Thinking'); setReply('…', 'hint'); }
+  else if (kind === 'error') { showError("Can't reach the PC. Is Tailscale on, with signal?", true); }
+  else {
+    setReply('<span class="">Twenty-two minutes, boss.</span><span class="pending"> Traffic’s light on the highway, so you’ll beat the rain.</span>');
+    if (kind === 'speaking' || kind === 'night') { setState('speaking'); V.cur = { id: 0, env: Array.from({ length: 400 }, (_, i) => 0.3 + 0.6 * Math.abs(Math.sin(i / 2.3))), url: '' }; Object.defineProperty(voiceEl, 'currentTime', { get: () => (Date.now() / 1000) % 19 }); }
+    else setState('idle');
+    if (kind === 'go') showGo('Home');
+    if (kind === 'play') showPlay({ url: 'https://open.spotify.com/playlist/demo2', name: 'Commute Heat' });
+  }
+  const m = /sheet=(\w+)/.exec(location.hash); if (m) openSheet(m[1]);
+}
+
+(function boot() {
+  applyTheme(); tick(); renderWx(); renderTiles(); renderQuick(); renderLink(); renderSpeed();
+  setState('idle');
+  if (convos[0] && Date.now() - convos[0].at < 6 * 3600e3) { $('#said').textContent = convos[0].heard ? `“${convos[0].heard}”` : ''; setReply(esc(convos[0].reply || 'Tap TARS and talk.'), 'hint'); }
+  else setReply(pcBase() ? 'Tap TARS and talk.' : 'Tap TARS and talk. First, link it to the PC.', 'hint');
+  setInterval(tick, 1000);
+  requestAnimationFrame(animate);
+  const d = /#demo(?:=(\w+))?/.exec(location.hash);
+  if (d) { demo(d[1] || 'idle'); return; }
+  gpsOn(); linkLoop();
+  if (!WX.at || Date.now() - WX.at > 15 * 60000) weather();
+  log(`opened v${VERSION}${standalone() ? ' (home screen)' : ''}${pcBase() ? ', linked' : ''}`);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => log('service worker: ' + e.message));
+})();
+</script>
+</body>
+</html>
