@@ -51,6 +51,7 @@ svg.i { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-widt
 #linkdot.ok::after { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 #linkdot.bad::after { background: var(--bad); }
 #linkdot.busy::after { background: var(--amber); }
+#linkdot.warn::after { background: var(--amber); box-shadow: 0 0 0 3px rgba(255, 181, 71, .3); }
 
 .hero { display: flex; flex-direction: column; gap: 2px; }
 .clock { font: 200 clamp(76px, 25vw, 124px)/.86 var(--display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; margin-left: -4px; }
@@ -272,7 +273,8 @@ html.home #hicons { display: flex; position: absolute; top: calc(env(safe-area-i
 #hlink { width: 7px; height: 7px; border-radius: 50%; margin: 0 10px 0 6px; background: var(--faint); }
 #hlink.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 #hlink.bad { background: var(--bad); }
-#hlink.busy { background: var(--amber); }
+#hlink.busy, #hlink.warn { background: var(--amber); }
+#hlink.warn { box-shadow: 0 0 0 2px rgba(255, 181, 71, .35); }
 html.home #hcar { display: flex; position: absolute; left: calc(env(safe-area-inset-left) + 24px); bottom: calc(env(safe-area-inset-bottom) + 20px); max-width: 46vw;
   align-items: center; gap: 9px; color: #c9d6ea; font-size: 15px; line-height: 1.3; text-shadow: 0 1px 12px rgba(0,0,0,.85); }
 #hcar svg.i { width: 19px; height: 19px; color: var(--amber); flex: none; }
@@ -429,6 +431,13 @@ pre.camlog { margin: 8px 0 0; font: 11.5px/1.45 var(--mono); white-space: pre-wr
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 14px; margin-bottom: 12px; }
 .card h3 { margin: 0 0 4px; font-size: 17px; }
 .card p, .note { margin: 4px 0 0; color: var(--dim); font-size: 14px; line-height: 1.45; }
+/* Settings, TARS link: the PC pieces the car leans on (car_health.py on the PC) */
+.pieces { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 7px; }
+.pieces li { display: flex; gap: 9px; align-items: baseline; font-size: 14px; line-height: 1.35; }
+.pieces li > i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; transform: translateY(-1px); }
+.pieces li.down > i { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.pieces li.unknown > i { background: var(--faint); }
+.pieces small { display: block; color: var(--dim); font-size: 13px; }
 .row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .row:last-child { border-bottom: 0; }
 .row .grow { flex: 1; min-width: 0; }
@@ -574,7 +583,7 @@ html[data-theme="night"] #toast { background: rgba(6,10,20,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.6.1';
+const VERSION = '1.7.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -800,7 +809,7 @@ async function hello(timeout = 8000) {
     const r = await fetch(`${pcBase()}/hello?v=${VERSION}`, { cache: 'no-store', signal: ctl.signal });
     if (!r.ok) throw new Error(r.status === 403 ? 'the PC refused this phone (Tailscale sign-in?)' : 'PC said ' + r.status);
     const j = await r.json();
-    Object.assign(L, { ok: true, rtt: Math.round(performance.now() - t0), err: '', busy: !!j.busy });
+    Object.assign(L, { ok: true, rtt: Math.round(performance.now() - t0), err: '', busy: !!j.busy, down: (j.health && j.health.down) || [] });
     if (!checks.pc || !checks.pc.ok) setCheck('pc', true, `${L.rtt} ms`);
     return j;
   } catch (e) {
@@ -816,7 +825,7 @@ async function linkLoop() {
 }
 function renderLink() {
   const d = $('#linkdot');
-  d.className = !pcBase() ? '' : L.ok === null ? 'busy' : L.ok ? (L.busy ? 'busy' : 'ok') : 'bad';
+  d.className = !pcBase() ? '' : L.ok === null ? 'busy' : L.ok ? (L.busy ? 'busy' : (L.down || []).length ? 'warn' : 'ok') : 'bad';
   $('#hlink').className = d.className;
   renderSetupBar();
 }
@@ -2672,7 +2681,8 @@ const SHEETS = {
     B.innerHTML = `
       <div class="card"><h3>TARS link</h3><p>Your PC’s Tailscale name, ending in .ts.net (in the Tailscale app, tap the PC and copy its name). Tailscale must be on for TARS to hear you.</p>
         <input class="field" id="spc" placeholder="pc-name.tailnet.ts.net" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(pcRaw())}">
-        <div class="acts"><button class="btn hot" id="spctest">Save + test</button></div><p id="spcres">${linkText()}</p></div>
+        <div class="acts"><button class="btn hot" id="spctest">Save + test</button></div><p id="spcres">${linkText()}</p>
+        <ul class="pieces" id="spieces" hidden></ul></div>
       <div class="card"><h3>Spotify</h3><p id="spstat">${spText()}</p>
         <div ${SP.connected ? 'hidden' : ''}><ol class="how">
           <li>On <b>developer.spotify.com/dashboard</b>, log in and tap <b>Create app</b>. Any name (TARS Drive), any description.</li>
@@ -2711,9 +2721,10 @@ const SHEETS = {
       const r = $('#spcres', B);
       if (!pcBase()) { r.textContent = 'Link removed.'; return; }
       r.textContent = 'Testing…';
-      try { await hello(10000); r.textContent = linkText(); setCheck('pc', true, `${L.rtt} ms`); }
+      try { await hello(10000); r.textContent = linkText(); setCheck('pc', true, `${L.rtt} ms`); loadPieces(B); }
       catch { r.textContent = linkText(); setCheck('pc', false, L.err); }
     };
+    loadPieces(B);
     const spm = t => { $('#spmsg', B).textContent = t; };
     const cp = $('#spcopy', B);
     if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(pcBase() + '/music/callback'); toast('Copied'); } catch { spm('Copy was blocked: long-press the address instead.'); } };
@@ -2806,9 +2817,26 @@ function mapsNote() {
     ? `${name} didn’t open from here, so GO uses its website. Install the app, or pick Apple Maps.`
     : `GO opens ${name}’s web link: the app if it’s installed, the website if not. Run Check this phone to switch to the faster app link.`;
 }
+// Settings, TARS link: every PC piece the car leans on, from GET /car/health. The PC also messages
+// Duwayne on Telegram when one goes down, so this is for a look, not a watch.
+async function loadPieces(B) {
+  const ul = $('#spieces', B); if (!ul || !pcBase()) return;
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(`${pcBase()}/health`, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const hm = s => { const t = new Date(s); return isNaN(t) ? '' : t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+    ul.innerHTML = (j.pieces || []).map(p => `<li class="${p.ok === false ? 'down' : p.ok ? 'ok' : 'unknown'}"><i></i><span>${esc(p.name)}`
+      + (p.ok === false ? `<small>Down since ${esc(hm(p.since))}${p.note ? ' · ' + esc(p.note) : ''}: ${esc(p.what)}</small>`
+        : p.id === 'disk' && p.note ? `<small>${esc(p.note)}</small>` : '') + '</span></li>').join('');
+    ul.hidden = !(j.pieces || []).length;
+  } catch { ul.hidden = true; }
+  finally { clearTimeout(tm); }
+}
 function linkText() {
   if (!pcBase()) return 'Not linked yet.';
-  if (L.ok) return `Linked ✓ ${L.rtt} ms${L.busy ? ' · TARS is busy right now' : ''}`;
+  if (L.ok) return `Linked ✓ ${L.rtt} ms${L.busy ? ' · TARS is busy right now' : ''}${(L.down || []).length ? ' · Down on the PC: ' + L.down.map(d => d.name).join(', ') : ''}`;
   if (L.ok === false) return `Can’t reach the PC: ${L.err}. Check Tailscale is on and the name is right.`;
   return 'Checking…';
 }
