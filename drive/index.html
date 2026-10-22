@@ -383,6 +383,7 @@ html.fx.boot .group { animation-delay: .26s; } html.fx.boot .group + .group { an
 .camchip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
 .camchip.rec .dot { background: #ff453a; box-shadow: 0 0 8px rgba(255,69,58,.75); animation: recdot 1.8s ease-in-out infinite; }
 .camchip.paused .dot, .camchip.starting .dot { background: var(--amber); }
+.camchip.parked { color: var(--dim); }
 .camchip.bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
 .camchip.bad .dot { background: var(--bad); }
 .camchip .el { color: var(--dim); font-weight: 600; }
@@ -583,7 +584,7 @@ html[data-theme="night"] #toast { background: rgba(6,10,20,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.7.0';
+const VERSION = '1.8.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -600,7 +601,7 @@ window.addEventListener('error', e => log('JS error: ' + e.message));
 window.addEventListener('unhandledrejection', e => log('JS rejection: ' + (e.reason && e.reason.message || e.reason)));
 
 // ---------- settings and saved things ----------
-const DEFAULT_CFG = { humor: 75, voice: true, duck: true, fx: true, maps: 'google', theme: 'auto', tg: '', autoHome: true };
+const DEFAULT_CFG = { humor: 75, voice: true, ack: true, duck: true, fx: true, maps: 'google', theme: 'auto', tg: '', autoHome: true };
 const DEFAULT_QUICK = [
   { label: 'Drive home?', text: 'How long is the drive home right now?' },
   { label: "Who's waiting?", text: "Who's waiting on me on WhatsApp?" },
@@ -726,6 +727,7 @@ function onFix(p) {
   if (!G.moving && G.fastSince && now - G.fastSince > 5000) { G.moving = true; if (!G.trip || now - G.trip.end > 180000) G.trip = { start: now, m: 0, end: now }; log('driving'); }
   if (G.moving && G.slowSince && now - G.slowSince > 60000) { G.moving = false; log('parked'); }
   if (G.trip && G.moving) { G.trip.end = now; if (now - (G.subAt || 0) > 30000) { G.subAt = now; renderSub(); } }
+  camParkWake(kmh);
   if (f.acc < 3000) {
     const a = { lat: Math.round(f.lat * 100) / 100, lon: Math.round(f.lon * 100) / 100 };   // ~1 km: enough for sun and weather
     if (!area || area.lat !== a.lat || area.lon !== a.lon) { area = a; store.set('area', a); renderSub(); applyTheme(); }
@@ -976,7 +978,8 @@ const saveCamCfg = () => store.set('cam', camCfg);
 const CAM = { db: null, dbErr: '', on: false, starting: false, stream: null, cur: null, wait: null, mime: '', started: 0, lastEnd: 0,
   seq: false, empty: 0, ab: false, fails: [], writing: 0, segs: [], saves: [], log: [], quota: Infinity, persisted: null, err: '',
   hiddenAt: 0, reopening: false, reopenAt: 0, mutedAt: 0, gpsAt: 0, aim: false, aimStream: null, urls: [], ready: new Map(),
-  demo: false, quickShown: null, sideToast: false, wasRec: false, waitLogged: new Set(), micBusy: false, offered: false, statAt: 0 };
+  demo: false, quickShown: null, sideToast: false, wasRec: false, waitLogged: new Set(), micBusy: false, offered: false, statAt: 0,
+  parkedOff: false, parkStopMs: 600000, movedAt: 0, fastFixes: 0 };
 const CP = { ok: false, off: 0, seen: 0, err: '', rtt: 0, busy: false, cur: '', timer: 0, polling: false, skipped: new Set() };
 const MO = { ok: false, denied: false, peak: 0, grav: null, hist: [], pending: null, lastSave: 0, sideways: 0 };
 let camReady = null;
@@ -1153,7 +1156,7 @@ async function camStart(fromTap) {
     if (CAM.stream && CAM.stream !== stream) CAM.stream.getTracks().forEach(t => t.stop());
     if (CAM.aimStream) { CAM.aimStream.getTracks().forEach(t => t.stop()); CAM.aimStream = null; }
     CAM.stream = stream; camWatchTrack(); camAimAttach();
-    Object.assign(CAM, { on: true, started: Date.now(), lastEnd: 0, empty: 0, wait: null, fails: [] });
+    Object.assign(CAM, { on: true, started: Date.now(), lastEnd: 0, empty: 0, wait: null, fails: [], parkedOff: false, movedAt: Date.now() });
     CAM.cur = camSegStart();
     if (!CAM.cur) { CAM.err = 'The recorder wouldn’t start'; CAM.on = false; stream.getTracks().forEach(t => t.stop()); CAM.stream = null; return; }
     wakeOn(); camQuota();
@@ -1194,7 +1197,7 @@ function camHidden() {
 async function camVisible() {
   camSyncSoon();
   if (!camCfg.on || CAM.demo || appMode() !== 'drive') return;
-  if (!CAM.on) { if (!CAM.starting) camStart(false); return; }
+  if (!CAM.on) { if (!CAM.starting && !CAM.parkedOff) camStart(false); return; }
   if (CAM.hiddenAt) camLog(`app visible again after ${((Date.now() - CAM.hiddenAt) / 1000).toFixed(1)} s`);
   if (!camTrack()) await camReopen('back on screen');
   if (CAM.on && !CAM.cur && !CAM.wait && camTrack()) CAM.cur = camSegStart();
@@ -1235,8 +1238,22 @@ function camTick() {
       CAM.sideToast = true; camLog('phone sideways with the screen upright: Portrait Orientation Lock');
       toast('Portrait Orientation Lock is on, so the dash cam records sideways. Turn it off in Control Centre.');
     }
+    // Parked a while (on GPS's word; no fix, no stop): the camera stops, since the ignition's off and the sun is on
+    // the windscreen, and camParkWake starts it again when the car moves. On 22 Oct it recorded an hour past parking.
+    if (CAM.on && fresh() && !G.moving && now - Math.max(CAM.movedAt, CAM.started) >= CAM.parkStopMs) {
+      CAM.parkedOff = true; camStop(`parked ${Math.round(CAM.parkStopMs / 60000)} min`);
+      toast('Parked: the dash cam stops until you drive');
+    }
   }
   camUi();
+}
+function camParkWake(kmh) {                           // every GPS fix: note movement, and wake a parked dash cam
+  const now = Date.now();
+  CAM.fastFixes = kmh >= 8 ? CAM.fastFixes + 1 : 0;
+  if (G.moving || CAM.fastFixes >= 2) CAM.movedAt = now;
+  if (CAM.parkedOff && (G.moving || CAM.fastFixes >= 2) && camCfg.on && appMode() === 'drive' && document.visibilityState === 'visible') {
+    CAM.parkedOff = false; camLog('moving again: dash cam on'); camStart(false);
+  }
 }
 
 // saves
@@ -1433,7 +1450,7 @@ function camState() {
   if (CAM.demo) return 'rec';
   if (!camCfg.on) return 'off';
   if (CAM.starting) return 'starting';
-  if (!CAM.on) return CAM.err ? 'bad' : 'starting';
+  if (!CAM.on) return CAM.parkedOff ? 'parked' : CAM.err ? 'bad' : 'starting';
   const tr = CAM.stream && CAM.stream.getVideoTracks()[0];
   if (!tr || tr.readyState === 'ended') return 'paused';    // reopens by itself (after TARS's question, or back on screen)
   return tr.muted ? 'paused' : 'rec';
@@ -1446,7 +1463,7 @@ function camUi() {
   else if (st === 'bad' && CAM.wasRec) { CAM.wasRec = false; speakLocal('The dash cam stopped.'); }   // only heard while driving
   const el = CAM.started ? Math.max(0, Math.floor((Date.now() - CAM.started) / 1000)) : 0;
   const clock = el >= 3600 ? `${Math.floor(el / 3600)}:${two(Math.floor(el / 60) % 60)}:${two(el % 60)}` : `${Math.floor(el / 60)}:${two(el % 60)}`;
-  const txt = st === 'rec' ? `REC <span class="el">${clock}</span>` : st === 'paused' ? 'PAUSED' : st === 'starting' ? 'CAM…' : 'CAM ✕';
+  const txt = st === 'rec' ? `REC <span class="el">${clock}</span>` : st === 'paused' ? 'PAUSED' : st === 'starting' ? 'CAM…' : st === 'parked' ? 'CAM · PARKED' : 'CAM ✕';
   const key = st + txt + (CP.busy ? '↑' : '');
   if (chip && key !== camShown) {
     camShown = key; chip.hidden = st === 'off';
@@ -1461,7 +1478,7 @@ function camChipTap() {
   wakeOn();
   const st = camState();
   if (st === 'starting') return;
-  if (st === 'bad' || !CAM.on) { camStart(true); return; }
+  if (st === 'bad' || !CAM.on) { CAM.parkedOff = false; camStart(true); return; }
   if (driving()) { toast(`Dash cam recording · ${mb(camUsed())} kept. Say “save that” or tap Save clip.`); return; }
   openSheet('cam');
 }
@@ -1513,10 +1530,11 @@ function camSheet(B) {
 function camStatusCard() {
   const el = $('#camstat'); if (!el) return;
   const st = camState(), tr = camTrack(), s = tr ? tr.getSettings() : null, rate = camCfg.kbps * 1000 / 8;
-  const head = { rec: 'Recording', paused: 'Paused by iOS', starting: 'Starting…', bad: CAM.err || 'Stopped', off: 'Off' }[st];
+  const head = { rec: 'Recording', paused: 'Paused by iOS', starting: 'Starting…', bad: CAM.err || 'Stopped', off: 'Off', parked: 'Stopped while parked' }[st];
   const lines = [];
   if (st === 'rec' || st === 'paused') lines.push(`Since ${hm(new Date(CAM.started))}${s && s.width ? ` · ${s.width}×${s.height} at ${Math.round(s.frameRate || camCfg.fps)} fps` : ''} · ${(camCfg.kbps / 1000).toFixed(1)} Mbps · no sound`);
   if (st === 'off') lines.push('Turn it on and it records the road whenever TARS Drive is open.');
+  if (st === 'parked') lines.push(`It stopped after ${Math.round(CAM.parkStopMs / 60000)} minutes parked, to save the battery and the phone, and starts again by itself when the car moves.`);
   if (st === 'bad') lines.push(CAM.err === 'Camera blocked' ? 'Allow the camera when iOS asks. If it never asks: iPhone Settings → Apps → Safari → Camera → Ask, then reopen TARS.' : 'Tap Start to try again.');
   const saved = CAM.segs.filter(x => x.locked).reduce((a, x) => a + x.size, 0), left = CAM.saves.filter(v => !v.done).length;
   lines.push(`On this phone: ${mb(camUsed())} of ${mb(camCap())} (about ${dur(camCap() / rate * 1000)} of driving) · saved clips ${mb(saved)}`);
@@ -1525,6 +1543,7 @@ function camStatusCard() {
     : `PC not reachable${CP.err ? ': ' + esc(CP.err) : ''}${left ? ` · ${left} to send` : ''}`);
   el.innerHTML = `<h3><span class="camdot ${st}"></span>${esc(head)}</h3>${lines.map(l => `<p>${l}</p>`).join('')}
     <div class="acts">${st === 'rec' || st === 'paused' ? `<button class="btn hot" data-cam="save">Save the last ${camCfg.before} s</button>` : ''}
+      ${st === 'parked' ? '<button class="btn hot" data-cam="retry">Start now</button>' : ''}
       <button class="btn${st === 'off' ? ' hot' : ''}" data-cam="${st === 'bad' ? 'retry' : 'toggle'}">${st === 'off' ? 'Turn on' : st === 'bad' ? 'Start' : 'Turn off'}</button></div>`;
 }
 const camReason = v => v.reason === 'impact' ? `Knock, ${v.g} g` : v.reason === 'tars' ? 'TARS' + (v.note ? `: ${v.note}` : '') : v.reason === 'voice' ? '“Save that”' : 'Save clip';
@@ -1579,7 +1598,7 @@ async function camSheetClick(e) {
   const b = e.target.closest('[data-cam],[data-cplay],[data-cshare],[data-cdel],[data-seg="camimpact"] button'); if (!b) return;
   const act = b.dataset.cam;
   if (act === 'save') { camSave('button'); return; }
-  if (act === 'retry') { camStart(true); return; }
+  if (act === 'retry') { CAM.parkedOff = false; camStart(true); return; }
   if (act === 'toggle') {
     if (!camCfg.on) { camTurnOn(); return; }
     modal('Turn the dash cam off?', 'It stops recording until you turn it on again. Saved clips stay.', [{ label: 'Keep recording' }, { label: 'Turn off', hot: true, run: () => { camTurnOff(); camStatusCard(); } }]);
@@ -1834,7 +1853,7 @@ function setAppMode(m, why) {
   if (!changed && why !== 'boot') return;
   if (changed) { log(`${m} mode (${why})`); MODE.switchedAt = performance.now(); }
   if (m === 'home') { camStop('home mode'); holeStart(); homeLoop(); renderHomeBits(); }
-  else { holeStop(); document.documentElement.classList.remove('ambient'); if (camCfg.on && document.visibilityState === 'visible' && why !== 'boot') camStart(false); }
+  else { holeStop(); document.documentElement.classList.remove('ambient'); if (camCfg.on && document.visibilityState === 'visible' && why !== 'boot') { CAM.parkedOff = false; camStart(false); } }
   if (changed) {
     clearAction();
     if (T.st === 'idle') setReply(m === 'home' ? 'Tap anywhere and talk.' : 'Tap TARS and talk.', 'hint');
@@ -1849,6 +1868,8 @@ function atHomeNow() {
   if (!h || !G.fix || Date.now() - G.fix.t > 120000 || G.fix.acc > 500) return null;
   return dist(G.fix, h) <= 120 + Math.min(G.fix.acc, 150);
 }
+// What Home mode tells TARS about where he is: home only on the GPS's word (Home mode on his desk at work isn't home).
+const whereNow = () => { const a = atHomeNow(); return a === true ? 'home' : a === false ? 'away' : 'unknown'; };
 function modeTick() {
   if (CAM.demo) return;
   // Moving at all quickly means the car: Drive mode straight away, so the dash cam catches the start of the trip.
@@ -2075,7 +2096,7 @@ function holeProbe() {                               // tests: draw a frame and 
 
 // ---------- TARS: listen, send, speak ----------
 const voiceEl = $('#voice');
-const T = { st: 'idle', rec: null, stream: null, chunks: [], ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null, tapAt: 0,
+const T = { st: 'idle', take: null, stream: null, ctx: null, an: null, srcNode: null, buf: null, t0: 0, cal: [], floor: null, tapAt: 0,
   aboveSince: 0, quietSince: 0, heard: false, anyAudio: false, vadOk: true, level: 0, vadTimer: 0, abort: null, turn: null, endReason: '' };
 const V = { q: [], cur: null };
 const STATUS = { idle: 'TARS', arming: 'Microphone', listening: 'Listening', sending: 'Sending', thinking: 'Thinking', speaking: 'TARS', error: 'TARS' };
@@ -2139,6 +2160,7 @@ function speakLocal(text) {                        // only for "can't reach the 
 function onTarsTap(e) {
   if (e && e.target.closest('.action')) return;
   wakeOn();
+  if (T.st === 'speaking' && V.cur && V.cur.ack) { cancelTurn(); return; }   // during the "On it": he's cancelling the question
   if (T.st === 'speaking') { stopVoice(); setState('idle'); markAll(); return; }
   if (T.st === 'listening') { endListening('tap'); return; }
   if (T.st === 'thinking' || T.st === 'sending') { cancelTurn(); return; }
@@ -2170,12 +2192,17 @@ async function startListening() {
   const mime = pickAudioMime();
   if (mime === null) { stream.getTracks().forEach(t => t.stop()); return failLocal("This phone can't record audio in the browser."); }
   T.stream = stream;
-  try { T.rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined); }
-  catch { try { T.rec = new MediaRecorder(stream); } catch (e) { stopMic(); return failLocal('The recorder would not start: ' + e.name); } }
-  T.chunks = [];
-  T.rec.ondataavailable = ev => { if (ev.data && ev.data.size) T.chunks.push(ev.data); };
-  T.rec.onstop = onRecorded;
-  try { T.rec.start(250); } catch (e) { stopMic(); return failLocal('The recorder would not start: ' + e.name); }
+  let rec;
+  try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined); }
+  catch { try { rec = new MediaRecorder(stream); } catch (e) { stopMic(); return failLocal('The recorder would not start: ' + e.name); } }
+  // Each recording keeps its own pieces and its own microphone. A recorder that finishes stopping late (a tap
+  // while it said Sending) used to take the next recording's pieces and close its microphone: on 21 Oct at
+  // 23:13 three turns in a row reached the PC as fragments it couldn't read.
+  const take = { rec, stream, chunks: [], dropped: false, done: false };
+  T.take = take;
+  rec.ondataavailable = ev => { if (ev.data && ev.data.size) take.chunks.push(ev.data); };
+  rec.onstop = () => onRecorded(take);
+  try { rec.start(250); } catch (e) { T.take = null; stopMic(); return failLocal('The recorder would not start: ' + e.name); }
   T.an = null;
   try {
     if (T.ctx) {
@@ -2221,24 +2248,44 @@ function endListening(reason) {
   clearInterval(T.vadTimer);
   T.endReason = reason;
   setState('sending', reason === 'nothing' ? 'TARS' : 'Sending');
-  try { if (T.rec && T.rec.state !== 'inactive') T.rec.stop(); else onRecorded(); } catch { onRecorded(); }
+  const take = T.take;
+  try { if (take && take.rec.state !== 'inactive') take.rec.stop(); else onRecorded(take); } catch { onRecorded(take); }
 }
-function stopMic() {
-  try { if (T.stream) T.stream.getTracks().forEach(t => t.stop()); } catch {}
+function stopMic(stream = T.stream) {
+  try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch {}
+  if (stream !== T.stream) return;                   // an earlier recording's microphone: the open one stays open
   try { if (T.srcNode) T.srcNode.disconnect(); } catch {}
   T.stream = null; T.srcNode = null; T.an = null;
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
 }
-function onRecorded() {
-  stopMic();
-  const blob = new Blob(T.chunks, { type: (T.rec && T.rec.mimeType) || 'audio/mp4' });
-  T.chunks = []; T.rec = null;
+// What the recording is, from its first bytes: Safari records MP4, Chrome WebM. Anything else isn't sent.
+async function audioKind(blob) {
+  try {
+    const b = new Uint8Array(await blob.slice(0, 12).arrayBuffer()), s = String.fromCharCode(...b);
+    if (s.slice(4, 8) === 'ftyp') return 'mp4';
+    if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'webm';
+    if (s.slice(0, 4) === 'OggS') return 'ogg';
+    if (s.slice(0, 4) === 'RIFF') return 'wav';
+    return '';
+  } catch { return '?'; }                            // can't look here: the PC decides
+}
+async function onRecorded(take) {
+  if (!take || take.done) return;
+  take.done = true;
+  stopMic(take.stream);
+  if (T.take === take) T.take = null;
+  if (take.dropped || T.st !== 'sending') return;    // cancelled, or a newer turn has started
+  const blob = new Blob(take.chunks, { type: take.rec.mimeType || 'audio/mp4' });
   if (T.endReason === 'nothing' || blob.size < 1200) { setState('idle'); setReply("I didn't hear anything. Tap TARS and try again.", 'hint'); return; }
+  const kind = await audioKind(blob);
+  if (take.dropped || T.st !== 'sending') return;
+  if (!kind) { log(`recording unreadable: ${blob.size} bytes ${blob.type}, not sent`); setState('idle'); setReply('That recording didn’t come through. Tap TARS and say it again.', 'hint'); return; }
   log(`recorded ${(blob.size / 1024).toFixed(0)} KB ${blob.type} (${T.endReason})`);
   sendTurn({ audio: blob });
 }
 function failLocal(msg) { stopMic(); setState('error'); setReply(esc(msg), 'err'); speakLocal(msg); }
 function cancelTurn() {
+  if (T.take) T.take.dropped = true;                 // a recording still stopping is thrown away, not sent
   if (T.turn) T.turn.cancelled = true;
   try { if (T.abort) T.abort.abort(); } catch {}
   stopVoice(); setState('idle'); setReply('Cancelled.', 'hint');
@@ -2255,7 +2302,9 @@ async function sendTurn(req) {
   let idleTimer = 0;
   const kick = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { turn.stalled = true; ctl.abort(); }, 30000); };
   kick();
-  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, places: placesParam(), v: VERSION, cam: camRecording() ? 1 : 0 };
+  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, ack: cfg.ack === false ? 0 : 1, places: placesParam(), v: VERSION, cam: camRecording() ? 1 : 0 };
+  if (turn.mode === 'home') o.where = whereNow();
+  if (req.audio) o.am = req.audio.type || '';
   try {
     const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal, cache: 'no-store' };
     const res = req.audio
@@ -2296,6 +2345,9 @@ function onEvent(ev, turn) {
       $('#said').textContent = ev.text ? `“${ev.text}”` : '';
       setState('thinking', 'Thinking'); setReply('…', 'hint');
       break;
+    case 'ack':                                      // "On it." in TARS's voice while the answer is worked out
+      if (cfg.voice && ev.audio && !turn.reply.length && !V.cur && !V.q.length) { log('ack: ' + ev.text); setReply(esc(ev.text), 'hint'); enqueueVoice({ ...ev, id: 'ack', ack: true }); }
+      break;
     case 'queued': setState('thinking', 'TARS is busy'); setReply('Finishing something else first…', 'hint'); break;
     case 'say': addSentence(ev, turn); break;
     case 'voice': enqueueVoice(ev); break;
@@ -2304,7 +2356,7 @@ function onEvent(ev, turn) {
     case 'music': musicSoon(400); break;
     case 'cam': if (ev.act === 'save') camSave('voice', turn.tapAt); break;
     case 'error':
-      if (ev.code === 'silence' || ev.code === 'short') { turn.error = ev.msg; stopVoice(); setReply(esc(ev.msg) + ' Tap TARS and try again.', 'hint'); setState('idle'); }
+      if (ev.code === 'silence' || ev.code === 'short' || ev.code === 'audio') { turn.error = ev.msg; stopVoice(); setReply(esc(ev.msg) + ' Tap TARS and try again.', 'hint'); setState('idle'); }
       else { turn.error = ev.msg; showError(ev.msg, false); }
       break;
     case 'done': turn.ms = ev.ms; break;
@@ -2354,7 +2406,7 @@ function enqueueVoice(ev) {
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
     const sent = document.querySelector(`#reply .sent[data-id="${ev.id}"]`);
     const words = sent ? fillWords(sent, ev.words && ev.words.length ? ev.words : spreadWords(sent.textContent, ev.dur || 1), 'up') : null;
-    V.q.push({ id: ev.id, url: URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' })), env: ev.env || [], dur: ev.dur || 0, words, k: 0, last: null });
+    V.q.push({ id: ev.id, url: URL.createObjectURL(new Blob([u8], { type: 'audio/mpeg' })), env: ev.env || [], dur: ev.dur || 0, words, k: 0, last: null, ack: !!ev.ack });
   } catch (e) { log('voice decode: ' + e.message); return; }
   if (!V.cur) playNext();
 }
@@ -2367,6 +2419,11 @@ function playNext() {
   const p = voiceEl.play();
   if (p) p.catch(err => {
     log('voice blocked: ' + err.name);
+    if (item.ack) {                                     // the "On it" isn't worth a tap: drop it, the answer follows
+      setTimeout(() => URL.revokeObjectURL(item.url), 5000); V.cur = null;   // later: the player may still be loading it
+      if (V.q.length) playNext(); else if (T.abort) setState('thinking', 'Thinking'); else settle();
+      return;
+    }
     if (err.name === 'NotAllowedError') {                // iOS wants a tap first: keep the reply and ask for one
       V.q.unshift(item); V.cur = null; markAll();
       setState('idle', 'Tap to hear TARS');
@@ -2379,7 +2436,10 @@ function playNext() {
 function voiceDone() {
   if (!V.cur) return;
   if (V.cur.words) reveal(V.cur.words);
-  URL.revokeObjectURL(V.cur.url); V.cur = null; playNext();
+  const ack = V.cur.ack;
+  URL.revokeObjectURL(V.cur.url); V.cur = null;
+  if (ack && !V.q.length && T.abort) { setState('thinking', T.turn && T.turn.reply.length ? 'Speaking' : 'Thinking'); return; }   // still working on it
+  playNext();
 }
 voiceEl.addEventListener('ended', voiceDone);
 voiceEl.addEventListener('error', () => { if (V.cur) { log('voice error'); voiceDone(); } });
@@ -2694,7 +2754,7 @@ const SHEETS = {
         <p class="note">Plays and pauses on whichever device Spotify is playing on, like your main iPhone in the car. Needs Premium.</p>
         ${seg('duck', [['1', 'Pause music while TARS talks'], ['0', 'Leave it playing']], cfg.duck ? '1' : '0')}
         <p class="note" id="spmsg"></p></div>
-      <div class="card"><h3>Dash cam</h3><p>Records the road whenever TARS Drive is open, with no picture on screen and no sound. Say “save that” or tap Save clip to keep a moment; it goes to your PC by itself.</p>
+      <div class="card"><h3>Dash cam</h3><p>Records the road whenever TARS Drive is open, with no picture on screen and no sound. Say “save that” or tap Save clip to keep a moment; it goes to your PC by itself. After 10 minutes parked it stops, and it starts again when the car moves.</p>
         ${seg('cam', [['1', 'On'], ['0', 'Off']], camCfg.on ? '1' : '0')}
         <div class="acts"><button class="btn small" id="scam">${icon('cam')} Clips, aim and settings</button></div></div>
       <div class="card"><h3>Home mode</h3><p>The phone on its stand at home: the black hole in the middle (tap it and talk), the weather and your car around it, and TARS talking like he’s in the room. The dash cam stays off.</p>
@@ -2704,7 +2764,9 @@ const SHEETS = {
       <div class="card"><h3>Humor setting</h3><p>TARS’s own dial. It’s told this with every question.</p>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:8px"><b style="font:300 34px var(--display)" id="shv">${cfg.humor}%</b></div>
         <input type="range" id="shum" min="0" max="100" step="5" value="${cfg.humor}"></div>
-      <div class="card"><h3>Voice replies</h3><p>Off means TARS answers on screen only.</p>${seg('voice', [['1', 'Spoken'], ['0', 'Screen only']], cfg.voice ? '1' : '0')}</div>
+      <div class="card"><h3>Voice replies</h3><p>Off means TARS answers on screen only.</p>${seg('voice', [['1', 'Spoken'], ['0', 'Screen only']], cfg.voice ? '1' : '0')}
+        <p class="note" style="margin-top:12px">While TARS works on an answer, a quick “On it” in his voice, so you know he heard you.</p>
+        ${seg('ack', [['1', '“On it” first'], ['0', 'Just the answer']], cfg.ack === false ? '0' : '1')}</div>
       <div class="card"><h3>Look</h3><p>Auto goes to the dim night look at sunset.</p>${seg('theme', [['auto', 'Auto'], ['day', 'Day'], ['night', 'Night']], cfg.theme)}
         <p class="note" style="margin-top:12px">Effects: the sky that follows the sun, the glass, TARS's sheen and reflection. Slow on purpose; off if the iPhone has Reduce Motion on.</p>
         ${seg('fx', [['1', 'Effects on'], ['0', 'Plain']], cfg.fx ? '1' : '0')}</div>
@@ -2755,6 +2817,7 @@ const SHEETS = {
       const b = e.target.closest('button'); if (!b) return;
       s.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
       if (s.dataset.seg === 'voice') cfg.voice = b.dataset.v === '1';
+      if (s.dataset.seg === 'ack') cfg.ack = b.dataset.v === '1';
       if (s.dataset.seg === 'duck') cfg.duck = b.dataset.v === '1';
       if (s.dataset.seg === 'theme') { cfg.theme = b.dataset.v; applyTheme(); }
       if (s.dataset.seg === 'fx') { cfg.fx = b.dataset.v === '1'; document.documentElement.classList.toggle('fx', cfg.fx); }
@@ -2820,7 +2883,7 @@ function mapsNote() {
 // Settings, TARS link: every PC piece the car leans on, from GET /car/health. The PC also messages
 // you on Telegram when one goes down, so this is for a look, not a watch.
 async function loadPieces(B) {
-  const ul = $('#spieces', B); if (!ul || !pcBase()) return;
+  const ul = $('#spieces', B); if (!ul || !pcBase() || CAM.demo) return;   // the demo's address is made up
   const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 8000);
   try {
     const r = await fetch(`${pcBase()}/health`, { cache: 'no-store', signal: ctl.signal });
