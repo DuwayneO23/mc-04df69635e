@@ -584,7 +584,7 @@ html[data-theme="night"] #toast { background: rgba(6,10,20,.94); }
 // TARS Drive: the car screen on the iPhone 11. Talk to TARS (the same TARS as Telegram, through the PC over
 // Tailscale), with replies spoken back in TARS's own voice; one-tap navigation and music; clock, weather, sunset,
 // speed. Nothing personal is in this file: places, playlists and the PC address live only in this phone's storage.
-const VERSION = '1.8.0';
+const VERSION = '1.9.0';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -821,9 +821,32 @@ async function hello(timeout = 8000) {
 }
 async function linkLoop() {
   clearTimeout(L.timer);
-  if (pcBase() && document.visibilityState === 'visible' && T.st === 'idle') { try { await hello(); } catch {} }
+  if (pcBase() && document.visibilityState === 'visible' && T.st === 'idle') { try { lateCheck(await hello()); } catch {} }
   else renderLink();
-  L.timer = setTimeout(linkLoop, L.ok ? 60000 : 20000);
+  L.timer = setTimeout(linkLoop, (L.lateUntil || 0) > Date.now() ? 8000 : L.ok ? 60000 : 20000);   // faster while an answer is owed
+}
+// An answer TARS finished after the phone stopped waiting (a long job): the PC keeps it, the link check lists it,
+// and it plays here like any reply, once, when TARS is idle and no menu is open.
+let lateSeen = new Set(store.get('lateSeen', []));
+async function lateCheck(j) {
+  const item = ((j && j.late) || []).find(x => !lateSeen.has(x.id));
+  if (!item || T.st !== 'idle' || sheetName || !$('#modal').hidden) return;
+  try {
+    const r = await fetch(`${pcBase()}/late?id=${encodeURIComponent(item.id)}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const late = await r.json();
+    if (T.st !== 'idle' || sheetName) return;          // he started something meanwhile: next time
+    lateSeen.add(item.id); store.set('lateSeen', [...lateSeen].slice(-30));
+    L.lateUntil = 0;
+    log('late answer ' + item.id);
+    const turn = { at: Date.now(), tapAt: Date.now(), kind: 'late', heard: '', reply: [], actions: [], error: '', mode: mode(), tid: item.id };
+    T.turn = turn;
+    stopVoice(); clearAction();
+    $('#said').textContent = 'Done, from earlier:';
+    if (cfg.voice) musicDuck();
+    for (const ev of late.events || []) onEvent(ev, turn);
+    finishTurn(turn);
+  } catch (e) { log('late answer: ' + e.message); }
 }
 function renderLink() {
   const d = $('#linkdot');
@@ -2211,7 +2234,7 @@ async function startListening() {
       T.srcNode.connect(T.an);
     }
   } catch (e) { log('level meter: ' + e.message); T.an = null; }
-  Object.assign(T, { t0: performance.now(), cal: [], floor: null, aboveSince: 0, quietSince: 0, heard: false, anyAudio: false, vadOk: !!T.an, endReason: '', level: 0 });
+  Object.assign(T, { t0: performance.now(), vad: vadState(), anyAudio: false, vadOk: !!T.an, vadWoke: false, endReason: '', level: 0 });
   setState('listening', T.an ? 'Listening' : 'Listening · tap when done');
   setReply(T.an ? 'Go ahead. I stop when you do.' : 'Go ahead, then tap TARS when you’re done.', 'hint');
   clearInterval(T.vadTimer); T.vadTimer = setInterval(vadTick, 50);
@@ -2228,27 +2251,70 @@ function vadTick() {
     if (pk > 0) T.anyAudio = true;
   }
   T.level = clamp((db + 58) / 38, 0, 1);
-  if (T.vadOk && el > 1000 && !T.anyAudio) {          // the meter only reads zeros: iOS kept it asleep. Fall back to tap-to-finish.
+  // The meter reads only zeros: iOS kept it asleep, so fall back to tap-to-finish. Not after 1 s any more, and not for
+  // good: a microphone that takes a second to wake (the test browser's does) used to lose the voice detector for the
+  // whole recording, which then ran on until a tap or the time limit.
+  if (T.vadOk && el > 2500 && !T.anyAudio) {
     T.vadOk = false; log('voice detector unavailable, tap to finish');
     $('#status').textContent = 'Listening · tap when done'; setReply('Go ahead, then tap TARS when you’re done.', 'hint');
+  } else if (!T.vadOk && T.an && T.anyAudio && !T.vadWoke) {
+    T.vadOk = T.vadWoke = true; log('voice detector woke up');
+    $('#status').textContent = 'Listening'; setReply('Go ahead. I stop when you do.', 'hint');
   }
-  const maxMs = mode() === 'driving' ? 15000 : 30000;
+  const maxMs = mode() === 'driving' ? 30000 : 60000;   // 22 Oct: a long message at his desk hit the old 30 s mid-sentence
   if (el > maxMs) return endListening('max');
-  if (!T.vadOk) return;
-  if (el < 300) { T.cal.push(db); return; }
-  if (T.floor == null) { const c = T.cal.slice().sort((a, b) => a - b); T.floor = clamp(c.length ? c[c.length >> 1] : -60, -80, -38); }
-  const on = Math.max(T.floor + 12, -50), off = Math.max(T.floor + 7, -55);
-  if (db > on) { T.aboveSince = T.aboveSince || now; if (!T.heard && now - T.aboveSince > 120) T.heard = true; T.quietSince = 0; }
-  else { T.aboveSince = 0; T.quietSince = db < off ? (T.quietSince || now) : 0; if (!T.heard) T.floor = T.floor * 0.97 + db * 0.03; }
-  if (T.heard && T.quietSince && now - T.quietSince > 1100) return endListening('pause');
-  if (!T.heard && el > 7000) return endListening('nothing');
+  if (!T.vadOk || (db < -150 && !T.vad.heard)) return;   // nothing from the microphone yet: not a reading of the room
+  const why = vadStep(T.vad, db, el);
+  if (why) endListening(why);
+}
+// When he has stopped talking, from the level the meter reads every 50 ms (dB) and the time since the tap (ms);
+// returns why to stop, or ''. At his desk on 22 Oct the room never went quiet enough (office noise, and iOS
+// raising the gain once he stopped), so short sentences kept recording for 9 to 14 s; in the car the room rule
+// already worked. So besides the room going quiet: the level well under his own voice, nothing as loud as his
+// voice for 2 s (people talking further off), or a steady sound (speech rises and falls with every syllable;
+// noise, even turned up, doesn't). A long message gets longer to breathe. Tested on made-up traces in tests/test_vad.js.
+const vadState = () => ({ pre: [], floor: null, sm: null, t: null, above: 0, heard: false, from: null, voiced: 0, lv: [], sds: [], spk: -100,
+  quiet: 0, low: 0, since: 0, flat: 0, win: [] });
+const nth = (a, q) => { if (!a.length) return -100; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * q))]; };
+function vadStep(S, db, el) {
+  const dt = S.t == null ? 50 : clamp(el - S.t, 0, 250); S.t = el;
+  // the room, until he talks: its quieter moments over the last 2 s (people talking nearby kept the average up so high
+  // that his voice never counted, and it gave up after 7 s)
+  if (!S.heard) { S.pre.push(db); if (S.pre.length > 40) S.pre.shift(); S.floor = clamp(nth(S.pre, 0.1), -80, -38); }
+  if (el < 300) return '';
+  S.sm = S.sm == null ? db : S.sm + (db - S.sm) * 0.35;            // smoothed, so the gaps between words don't count
+  S.win.push(db); if (S.win.length > 12) S.win.shift();            // the last 0.6 s, for how steady it is
+  const mean = S.win.reduce((a, x) => a + x, 0) / S.win.length;
+  const sd = Math.sqrt(S.win.reduce((a, x) => a + (x - mean) ** 2, 0) / S.win.length);
+  const on = Math.max(S.floor + 12, -50), off = Math.max(S.floor + 7, -55);
+  if (db > on) {
+    S.above += dt; if (!S.heard && S.above > 120) { S.heard = true; S.from = el; }
+    // how much his voice rises and falls, from his first seconds of talking (later on, noise turned up could pass for him)
+    if (el - S.from >= 600 && el - S.from <= 3000) S.sds.push(sd);
+    if (S.voiced < 600 || sd >= 3) {                                 // his voice: it rises and falls (noise turned up doesn't)
+      S.voiced += dt; S.lv.push(S.sm); if (S.lv.length > 60) S.lv.shift();   // the last 3 s of it: a voice can fade
+    }
+  } else S.above = 0;
+  if (!S.heard) return el > 7000 ? 'nothing' : '';
+  S.spk = nth(S.lv, 0.8);                                            // his voice: the 80th percentile while he spoke
+  const hold = S.voiced > 2000 ? 1500 : 1000;                       // a long message: room to think
+  S.quiet = S.sm < off ? S.quiet + dt : 0;                          // the room has gone quiet
+  S.low = S.voiced >= 600 && S.sm < S.spk - 14 ? S.low + dt : 0;    // well under his voice
+  S.since = S.sm >= S.spk - 5 ? 0 : S.since + dt;                   // nothing as loud as his voice
+  S.flat = S.win.length >= 12 && sd < 2.5 && S.sm < S.spk + 3 && nth(S.sds, 0.9) >= 4 ? S.flat + dt : 0;   // a steady sound, when his voice isn't one
+  if (S.quiet >= hold) return 'pause';
+  if (S.low >= hold + 200) return 'drop';
+  if (S.voiced >= 250 && S.flat >= hold) return 'steady';
+  if (S.voiced >= 250 && S.since >= 2000) return 'stopped';
+  return '';
 }
 function endListening(reason) {
   if (T.st !== 'listening') return;
   clearInterval(T.vadTimer);
   T.endReason = reason;
   setState('sending', reason === 'nothing' ? 'TARS' : 'Sending');
-  const take = T.take;
+  const take = T.take, S = T.vad || {};
+  if (take) take.info = { end: reason, rec: Math.round(performance.now() - T.t0), spk: Math.round(S.spk ?? -100), fl: Math.round(S.floor ?? -100) };
   try { if (take && take.rec.state !== 'inactive') take.rec.stop(); else onRecorded(take); } catch { onRecorded(take); }
 }
 function stopMic(stream = T.stream) {
@@ -2281,18 +2347,21 @@ async function onRecorded(take) {
   if (take.dropped || T.st !== 'sending') return;
   if (!kind) { log(`recording unreadable: ${blob.size} bytes ${blob.type}, not sent`); setState('idle'); setReply('That recording didn’t come through. Tap TARS and say it again.', 'hint'); return; }
   log(`recorded ${(blob.size / 1024).toFixed(0)} KB ${blob.type} (${T.endReason})`);
-  sendTurn({ audio: blob });
+  sendTurn({ audio: blob, info: take.info });
 }
 function failLocal(msg) { stopMic(); setState('error'); setReply(esc(msg), 'err'); speakLocal(msg); }
 function cancelTurn() {
   if (T.take) T.take.dropped = true;                 // a recording still stopping is thrown away, not sent
   if (T.turn) T.turn.cancelled = true;
+  if (T.abort && T.turn && T.turn.tid && pcBase())   // the PC keeps a late answer unless it hears this
+    fetch(`${pcBase()}/cancel?tid=${encodeURIComponent(T.turn.tid)}`, { method: 'POST', keepalive: true, cache: 'no-store' }).catch(() => {});
   try { if (T.abort) T.abort.abort(); } catch {}
   stopVoice(); setState('idle'); setReply('Cancelled.', 'hint');
 }
 function placesParam() { return places.slice(0, 30).map(p => `${String(p.name).replace(/[|~]/g, ' ')}~${p.kind || ''}`).join('|'); }
 async function sendTurn(req) {
-  const turn = { at: Date.now(), tapAt: T.tapAt || Date.now(), kind: req.audio ? 'voice' : 'quick', heard: req.label || '', reply: [], actions: [], error: '', mode: mode() };
+  const turn = { at: Date.now(), tapAt: T.tapAt || Date.now(), kind: req.audio ? 'voice' : 'quick', heard: req.label || '', reply: [], actions: [], error: '', mode: mode(),
+    tid: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
   T.turn = turn;
   stopVoice(); clearAction();
   $('#said').textContent = req.audio ? '' : `“${req.label || req.text}”`;
@@ -2302,9 +2371,9 @@ async function sendTurn(req) {
   let idleTimer = 0;
   const kick = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { turn.stalled = true; ctl.abort(); }, 30000); };
   kick();
-  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, ack: cfg.ack === false ? 0 : 1, places: placesParam(), v: VERSION, cam: camRecording() ? 1 : 0 };
+  const o = { mode: turn.mode, humor: cfg.humor, voice: cfg.voice ? 1 : 0, ack: cfg.ack === false ? 0 : 1, places: placesParam(), v: VERSION, cam: camRecording() ? 1 : 0, tid: turn.tid };
   if (turn.mode === 'home') o.where = whereNow();
-  if (req.audio) o.am = req.audio.type || '';
+  if (req.audio) { o.am = req.audio.type || ''; Object.assign(o, req.info || {}); }    // how it decided he'd finished, for the PC's log
   try {
     const opts = { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal, cache: 'no-store' };
     const res = req.audio
@@ -2343,7 +2412,7 @@ function onEvent(ev, turn) {
     case 'heard':
       turn.heard = ev.text || '';
       $('#said').textContent = ev.text ? `“${ev.text}”` : '';
-      setState('thinking', 'Thinking'); setReply('…', 'hint');
+      if (!(V.cur && V.cur.ack)) { setState('thinking', 'Thinking'); setReply('…', 'hint'); }   // the "One sec." can come first
       break;
     case 'ack':                                      // "On it." in TARS's voice while the answer is worked out
       if (cfg.voice && ev.audio && !turn.reply.length && !V.cur && !V.q.length) { log('ack: ' + ev.text); setReply(esc(ev.text), 'hint'); enqueueVoice({ ...ev, id: 'ack', ack: true }); }
@@ -2357,6 +2426,10 @@ function onEvent(ev, turn) {
     case 'cam': if (ev.act === 'save') camSave('voice', turn.tapAt); break;
     case 'error':
       if (ev.code === 'silence' || ev.code === 'short' || ev.code === 'audio') { turn.error = ev.msg; stopVoice(); setReply(esc(ev.msg) + ' Tap TARS and try again.', 'hint'); setState('idle'); }
+      else if (ev.code === 'long') {                   // a long job: the PC keeps the answer, and the link check brings it
+        turn.long = true; if (!turn.reply.length) setReply(esc(ev.msg), 'hint');
+        L.lateUntil = Date.now() + 40 * 60000; clearTimeout(L.timer); L.timer = setTimeout(linkLoop, 8000);
+      }
       else { turn.error = ev.msg; showError(ev.msg, false); }
       break;
     case 'done': turn.ms = ev.ms; break;
@@ -2454,7 +2527,7 @@ function settle() {                                  // after the last voice, or
   markAll(); setState('idle');
 }
 function finishTurn(turn) {
-  if (!turn.reply.length && !turn.error && !turn.actions.length) { turn.error = 'TARS had nothing to say.'; showError(turn.error, false); }
+  if (!turn.reply.length && !turn.error && !turn.actions.length && !turn.long) { turn.error = 'TARS had nothing to say.'; showError(turn.error, false); }
   convos.unshift({ at: turn.at, kind: turn.kind, heard: turn.heard, reply: turn.reply.join(' '), actions: turn.actions, error: turn.error, ms: turn.ms, mode: turn.mode });
   convos = convos.slice(0, 60); store.set('history', convos);
   if (!cfg.voice || !V.cur && !V.q.length) { markAll(); if (T.st !== 'error') setState('idle'); }
